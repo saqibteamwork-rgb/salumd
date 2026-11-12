@@ -333,9 +333,14 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
+    const publicIndex = path.join(__dirname, 'public', 'index.html');
+    if (fs.existsSync(publicIndex)) {
+        return res.sendFile(publicIndex);
+    }
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -2048,3 +2053,5 @@ server.listen(PORT, '0.0.0.0', () => {
         }, 8 * 60 * 1000); // Ping every 5 minutes
     }
 });
+
+module.exports = app;
