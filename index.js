@@ -336,6 +336,22 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname)));
 
+// ═════════════════════════════════════════════════════════
+// 24/7 CLOUD HEALTHCHECK & ANTI-SLEEP ENDPOINTS
+// ═════════════════════════════════════════════════════════
+app.get(['/health', '/ping', '/live', '/keepalive'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
+    res.status(200).json({
+        status: 'ok',
+        alive: true,
+        uptime: Math.floor(process.uptime()),
+        timestamp: Date.now(),
+        activeSessions: activeCount,
+        memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
+    });
+});
+
 app.get('/', (req, res) => {
     const publicIndex = path.join(__dirname, 'public', 'index.html');
     if (fs.existsSync(publicIndex)) {
@@ -804,7 +820,7 @@ class BotSession {
 
     startActiveCheck() {
         if (this.activeInterval) clearInterval(this.activeInterval);
-        // Regular gentle presence update keeps WebSocket healthy without triggering rate limits
+        // High-frequency presence ping every 25s prevents WhatsApp from closing idle Baileys WebSocket
         this.activeInterval = setInterval(async () => {
             if (this.isConnected && this.sock?.user) {
                 try {
@@ -813,7 +829,7 @@ class BotSession {
                     // Do not forcefully terminate socket on temporary presence update failure
                 }
             }
-        }, 60 * 1000);
+        }, 25 * 1000);
     }
 
     async initialize(pairingNumber = null) {
@@ -823,14 +839,22 @@ class BotSession {
         }
         this.isInitializing = true;
         try {
-            // Clean up any stale socket to prevent duplicate connections and code 500 conflicts
+            // Clean up any stale socket to prevent duplicate connections and code 500/440 conflicts
             if (this.sock) {
                 try {
+                    if (this.activeInterval) {
+                        clearInterval(this.activeInterval);
+                        this.activeInterval = null;
+                    }
                     this.sock.ev.removeAllListeners();
-                    if (this.sock.ws && this.sock.ws.readyState === 1) {
-                        this.sock.ws.close();
+                    try { this.sock.end(undefined); } catch (e) {}
+                    if (this.sock.ws) {
+                        try { this.sock.ws.removeAllListeners(); } catch (e) {}
+                        try { this.sock.ws.terminate(); } catch (e) {}
+                        try { this.sock.ws.close(); } catch (e) {}
                     }
                 } catch (e) {}
+                this.sock = null;
             }
 
             if (pairingNumber) {
@@ -2155,11 +2179,14 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
         // ═════════════════════════════════════════════════════════
         // ULTRA RESILIENT 24/7 ANTI-SLEEP ENGINE (Multi-Target Ping)
         // ═════════════════════════════════════════════════════════
+        const baseRailwayUrl = 'https://web-production-08da5300.up.railway.app';
         const pingTargets = [
-            'https://web-production-08da5300.up.railway.app',
+            baseRailwayUrl,
+            `${baseRailwayUrl}/health`,
+            process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}/health` : null,
             process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : null,
-            process.env.APP_URL,
-            `http://127.0.0.1:${PORT}`
+            process.env.APP_URL ? `${process.env.APP_URL}/health` : null,
+            `http://127.0.0.1:${PORT}/health`
         ].filter(Boolean);
 
         const uniqueTargets = [...new Set(pingTargets)];
@@ -2169,19 +2196,18 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
                 try {
                     await axios.get(target, {
                         timeout: 10000,
-                        headers: { 'User-Agent': 'AntiSleep-KeepAlive/2.0' }
+                        headers: { 'User-Agent': 'AntiSleep-KeepAlive/3.0' }
                     });
                 } catch (e) {}
             }
-            console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲 (Keep-Alive Sent)');
-        }, 60 * 1000); // High-frequency ping every 60 seconds prevents cloud sleeping 24/7!
+        }, 45 * 1000); // High-frequency ping every 45 seconds prevents cloud sleeping 24/7!
 
-        // Periodic Memory Trimmer (Runs every 5 mins to prevent memory leaks and lag)
+        // Periodic Memory Trimmer (Runs every 2 mins to prevent memory leaks and OOM crashes)
         setInterval(() => {
             if (global.gc) {
                 try { global.gc(); } catch (e) {}
             }
-        }, 5 * 60 * 1000);
+        }, 2 * 60 * 1000);
     });
 }
 
