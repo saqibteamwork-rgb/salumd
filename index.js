@@ -856,11 +856,16 @@ class BotSession {
                 linkPreviewImageThumbnailWidth: 192,
                 transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
                 getMessage: async (key) => {
+                    if (!key || key.remoteJid?.endsWith('@newsletter')) {
+                        return undefined;
+                    }
                     if (messageLogs[key.id]?.rawMessage) {
                         return messageLogs[key.id].rawMessage;
                     }
                     if (messageLogs[key.id]?.text) {
-                        return { conversation: messageLogs[key.id].text };
+                        const t = messageLogs[key.id].text;
+                        if (t.includes('Bot is active') || t.includes('bot is active')) return undefined;
+                        return { conversation: t };
                     }
                     return undefined;
                 },
@@ -999,6 +1004,8 @@ class BotSession {
                             } catch (arcErr) {
                                 console.error('[ARC Upsert Error]:', arcErr.message);
                             }
+                            // Strictly exit here: Channels must never run commands, auto-replies, or retry loops!
+                            return;
                         }
 
                         // Check for group participant stub updates (Join via link, Add, Leave, Kick)
@@ -1971,11 +1978,16 @@ app.get('/api/qr/start', async (req, res) => {
             retryRequestDelayMs: 5000,
             maxMsgRetryCount: 5,
             getMessage: async (key) => {
+                if (!key || key.remoteJid?.endsWith('@newsletter')) {
+                    return undefined;
+                }
                 if (messageLogs[key.id]?.rawMessage) {
                     return messageLogs[key.id].rawMessage;
                 }
                 if (messageLogs[key.id]?.text) {
-                    return { conversation: messageLogs[key.id].text };
+                    const t = messageLogs[key.id].text;
+                    if (t.includes('Bot is active') || t.includes('bot is active')) return undefined;
+                    return { conversation: t };
                 }
                 return undefined;
             },

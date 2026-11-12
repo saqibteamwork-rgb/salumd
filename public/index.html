@@ -264,115 +264,146 @@
     </header>
 
     <!-- ================================================================= -->
-    <!-- 2. COMPACT PAIRING & QR SLAB (Neat, Not Over-Sized)               -->
+    <!-- 2. HERO PAIRING & QR WORKSPACE (Enlarged, Centered Main Focus)    -->
     <!-- ================================================================= -->
-    <section class="glass-slab px-4 py-5 sm:px-6 sm:py-6">
-      <div class="relative z-10">
-        <!-- Header Row -->
-        <div class="flex items-center justify-between gap-2 mb-4">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <h2 class="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-              Connect WhatsApp
-            </h2>
-          </div>
+    <section class="glass-slab p-5 sm:p-7 md:p-8 rounded-3xl relative overflow-hidden shadow-2xl shadow-emerald-500/10 border-2 border-white/90 ring-1 ring-emerald-500/20">
+      <!-- Ambient Inner Backdrop Glow -->
+      <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-48 bg-gradient-to-b from-emerald-400/25 to-teal-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          <!-- Compact Tabs -->
-          <div class="glass-pill p-1 rounded-xl flex items-center gap-1">
+      <div class="relative z-10 max-w-2xl mx-auto">
+        <!-- Centered Header -->
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50/90 border border-emerald-200 text-emerald-800 text-xs font-black mb-2 shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Instant Bot Linker · 24/7 Active</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            Connect Your WhatsApp
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500 font-semibold mt-1.5 max-w-md mx-auto">
+            Pair your number with 8-digit code or scan QR code instantly with zero wait time.
+          </p>
+        </div>
+
+        <!-- Centered Tab Selector -->
+        <div class="flex justify-center mb-6">
+          <div class="glass-pill p-1.5 rounded-2xl flex items-center gap-1.5 shadow-sm border border-slate-200/80 bg-white/70">
             <button
               id="tabCodeBtn"
               onclick="switchPairTab('code')"
-              class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm cursor-pointer"
+              class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95"
             >
-              <i class="fa-solid fa-key text-[11px]"></i>
-              <span>Pair Code</span>
+              <i class="fa-solid fa-key text-xs"></i>
+              <span>8-Digit Pair Code</span>
             </button>
             <button
               id="tabQrBtn"
               onclick="switchPairTab('qr')"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/60 cursor-pointer"
+              class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95"
             >
-              <i class="fa-solid fa-qrcode text-[11px]"></i>
-              <span>QR Scan</span>
+              <i class="fa-solid fa-qrcode text-xs"></i>
+              <span>QR Code Scan</span>
             </button>
           </div>
         </div>
 
-        <!-- TAB 1: PAIRING CODE -->
-        <div id="pairingCodeTab" class="space-y-3.5">
-          <!-- Input + Button Group -->
-          <div class="flex flex-col sm:flex-row items-center gap-2.5">
+        <!-- TAB 1: PAIRING CODE (Main Hero Focus) -->
+        <div id="pairingCodeTab" class="space-y-4">
+          <!-- Input + Large CTA Button -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div class="relative w-full flex-1">
-              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <i class="fa-solid fa-phone text-xs"></i>
+              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-emerald-600">
+                <i class="fa-solid fa-phone text-sm"></i>
               </div>
               <input
                 type="tel"
                 id="phoneInput"
                 placeholder="Enter WhatsApp number (e.g. 923001234567)"
                 value=""
-                class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/90 border border-slate-200/90 focus:border-emerald-500 focus:bg-white focus:outline-none text-slate-900 font-bold placeholder-slate-400 text-sm shadow-sm transition"
+                class="w-full pl-11 pr-4 py-3.5 sm:py-4 rounded-2xl bg-white border-2 border-slate-200/90 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 focus:outline-none text-slate-900 font-extrabold placeholder-slate-400 text-sm sm:text-base shadow-sm transition"
               />
             </div>
             <button
               id="pairBtn"
-              class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-teal-500/25 active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0"
+              class="w-full sm:w-auto px-7 sm:px-9 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-black text-sm sm:text-base shadow-lg shadow-teal-500/30 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
             >
-              <i class="fa-solid fa-bolt text-xs"></i>
+              <i class="fa-solid fa-bolt text-sm"></i>
               <span id="pairBtnText">Get Code</span>
             </button>
           </div>
 
-          <!-- Pairing Code Display Card -->
-          <div id="codeResultArea" class="hidden pt-1">
-            <div class="pairing-box rounded-xl p-4 text-center cursor-pointer relative group">
-              <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-0.5">
+          <!-- Pairing Code Display Card (Large, Bold, Centered) -->
+          <div id="codeResultArea" class="hidden pt-2">
+            <div class="pairing-box rounded-2xl p-5 sm:p-6 text-center cursor-pointer relative group border-2 border-dashed border-emerald-400/90 bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-white shadow-inner">
+              <span class="text-xs font-black text-emerald-800 uppercase tracking-widest block mb-1">
                 Your 8-Digit Pairing Code (Tap to Copy)
               </span>
-              <div id="codeDisplay" class="text-2xl sm:text-3xl font-extrabold text-slate-900 my-1 select-all tracking-widest font-mono">
+              <div id="codeDisplay" class="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 my-2 select-all tracking-[0.25em] font-mono leading-tight">
                 WAITING...
               </div>
-              <div class="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-medium">
-                <i class="fa-regular fa-copy text-emerald-600"></i>
-                <span id="copyFeedback">Tap anywhere to copy</span>
+              <div class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 border border-emerald-300 text-xs text-emerald-700 font-bold shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition">
+                <i class="fa-regular fa-copy"></i>
+                <span id="copyFeedback">Tap anywhere to copy code</span>
               </div>
             </div>
 
             <!-- Instructions -->
-            <div class="mt-2.5 p-3 rounded-xl bg-white/70 border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
-              <div class="font-bold text-slate-800 flex items-center gap-1">
-                <i class="fa-solid fa-circle-info text-emerald-500"></i>
-                <span>Kaise enter karein:</span>
+            <div class="mt-3.5 p-3.5 rounded-2xl bg-white/80 border border-slate-200/90 text-xs text-slate-600 space-y-1.5 shadow-sm">
+              <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+                <span>How to link in WhatsApp:</span>
               </div>
-              <p>WhatsApp &gt; <strong>Linked Devices</strong> &gt; <strong>Link with phone number instead</strong> &gt; Upar wala code enter karein.</p>
+              <p class="leading-relaxed">
+                Open WhatsApp &gt; <strong>Linked Devices</strong> &gt; <strong>Link with phone number instead</strong> &gt; Enter the 8-digit code above.
+              </p>
             </div>
           </div>
 
           <!-- Status Alert -->
-          <div id="connStatusBox" class="hidden p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition">
-            <i id="connStatusIcon" class="fa-solid fa-spinner fa-spin text-sm"></i>
+          <div id="connStatusBox" class="hidden p-3 rounded-2xl border text-xs sm:text-sm font-bold flex items-center gap-2.5 transition shadow-sm">
+            <i id="connStatusIcon" class="fa-solid fa-spinner fa-spin text-base"></i>
             <span id="connStatusMsg">Waiting for code entry...</span>
+          </div>
+
+          <!-- 3 Step Flow Guide -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 mt-2 border-t border-slate-200/70 text-center">
+            <div class="p-2.5 rounded-xl bg-white/60 border border-slate-200/60 shadow-xs">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Step 1</span>
+              <span class="text-xs font-extrabold text-slate-800">Enter Number</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/60 border border-slate-200/60 shadow-xs">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Step 2</span>
+              <span class="text-xs font-extrabold text-slate-800">Tap "Get Code"</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/60 border border-slate-200/60 shadow-xs">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Step 3</span>
+              <span class="text-xs font-extrabold text-slate-800">Link Device</span>
+            </div>
           </div>
         </div>
 
-        <!-- TAB 2: QR CODE SCAN -->
-        <div id="qrCodeTab" class="hidden space-y-3">
-          <div class="flex flex-col items-center justify-center py-2">
+        <!-- TAB 2: QR CODE SCAN (Centered & Prominent) -->
+        <div id="qrCodeTab" class="hidden space-y-4">
+          <div class="flex flex-col items-center justify-center py-3">
             <button
               id="qrGenBtn"
-              class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs shadow-md shadow-teal-500/25 active:scale-95 transition flex items-center gap-1.5 cursor-pointer mb-3"
+              class="px-7 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-black text-sm shadow-lg shadow-teal-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer mb-4"
             >
-              <i class="fa-solid fa-qrcode text-xs"></i>
+              <i class="fa-solid fa-qrcode text-sm"></i>
               <span id="qrGenBtnText">Generate QR Code</span>
             </button>
 
-            <div id="qrDisplayContainer" class="hidden p-3 rounded-2xl bg-white shadow-lg border border-slate-200 flex flex-col items-center">
-              <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="w-48 h-48 rounded-lg" />
-              <p class="text-[11px] text-slate-500 font-semibold mt-2 flex items-center gap-1">
+            <div id="qrDisplayContainer" class="hidden p-4 rounded-3xl bg-white shadow-xl border-2 border-slate-200 flex flex-col items-center">
+              <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="w-56 h-56 rounded-xl" />
+              <p class="text-xs text-slate-600 font-bold mt-3 flex items-center gap-1.5">
                 <i class="fa-solid fa-camera text-emerald-500"></i>
-                WhatsApp &gt; Linked Devices se scan karein
+                <span>WhatsApp &gt; Linked Devices se scan karein</span>
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
           </div>
         </div>
       </div>
@@ -940,13 +971,13 @@
       if (tab === 'code') {
         codeTab.classList.remove('hidden');
         qrTab.classList.add('hidden');
-        codeBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm cursor-pointer';
-        qrBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/60 cursor-pointer';
+        codeBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95';
+        qrBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95';
       } else {
         codeTab.classList.add('hidden');
         qrTab.classList.remove('hidden');
-        qrBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm cursor-pointer';
-        codeBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:bg-white/60 cursor-pointer';
+        qrBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95';
+        codeBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95';
       }
     }
 
