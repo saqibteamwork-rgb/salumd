@@ -475,7 +475,7 @@ const CONTACT_FALLBACK = {
     tiktok: "https://www.tiktok.com/@mr_saqib_242",
     snapchat: "https://www.snapchat.com/add/mrsaqib242",
     telegram: "https://t.me/mrsaqib242",
-    portfolio: "https://mrsaqib242.vercel.app",
+    portfolio: "https://mrsaqib.me",
     github: "https://github.com/mr-saqib-242",
     resume: "/resume.pdf",
     contract_status: "Open for New Projects",
@@ -512,6 +512,7 @@ app.get(['/api/contact', '/api/public/contact'], async (req, res) => {
         if (upstreamRes.ok) {
             const data = await upstreamRes.json();
             if (data && data.success && data.data) {
+                data.data.portfolio = 'https://mrsaqib.me';
                 contactCache = data.data;
                 contactCacheTime = now;
                 return res.json({ success: true, source: 'upstream', data: data.data });

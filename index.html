@@ -192,13 +192,13 @@
   <main class="w-full max-w-[820px] space-y-4 sm:space-y-5">
 
     <!-- ================================================================= -->
-    <!-- 1. TOP HEADER WITH USER DP & WEBSITE LINK                         -->
+    <!-- 1. SLIM & COMPACT TOP HEADER                                      -->
     <!-- ================================================================= -->
-    <header class="glass-slab px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
+    <header class="glass-slab px-3.5 py-2.5 sm:px-5 sm:py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
         <!-- User Official DP Avatar (Dynamically fetched from API) -->
         <div class="relative flex-shrink-0">
-          <div class="w-12 h-12 sm:w-13 sm:h-13 rounded-full p-[2px] bg-gradient-to-tr from-emerald-500 via-teal-400 to-sky-500 shadow-md shadow-teal-500/25">
+          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-gradient-to-tr from-emerald-500 via-teal-400 to-sky-500 shadow-sm">
             <img
               id="headerAvatar"
               src="https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_wa-uriEMC.png"
@@ -207,58 +207,47 @@
             />
           </div>
           <!-- Online Status Badge -->
-          <span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white ring-2 ring-emerald-200/60 animate-pulse"></span>
+          <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-200/60 animate-pulse"></span>
         </div>
 
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">MR SAQIB MD</h1>
-            <span id="headerBadge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <h1 class="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight leading-none">MR SAQIB MD</h1>
+            <span id="headerBadge" class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
               Verified ID
             </span>
           </div>
-          <p class="text-[11px] sm:text-xs font-semibold text-slate-500">
-            Created by <a id="headerCreatorLink" href="https://mrsaqib242.vercel.app" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline font-bold">Muhammad Saqib</a> · <span id="headerTagline">Full-Stack Engineer & Cyber Security Specialist</span>
+          <p class="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate mt-0.5">
+            Created by <a id="headerCreatorLink" href="https://mrsaqib.me" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline font-bold">Muhammad Saqib</a> · <span id="headerTagline">Full-Stack & Security</span>
           </p>
         </div>
       </div>
 
-      <!-- Action Link Badges: Portfolio, WhatsApp, Instagram (From API) -->
-      <div class="flex items-center gap-2 flex-wrap justify-center">
-        <!-- Main Portfolio Website -->
+      <!-- Action Links: Official Website mrsaqib.me + Quick WhatsApp -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <!-- Main Portfolio Website: mrsaqib.me -->
         <a
           id="headerPortfolioBtn"
-          href="https://mrsaqib242.vercel.app"
+          href="https://mrsaqib.me"
           target="_blank"
           rel="noopener noreferrer"
-          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 hover:bg-white transition cursor-pointer shadow-sm active:scale-95"
+          class="glass-pill px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/90 hover:bg-white transition cursor-pointer shadow-xs active:scale-95"
         >
           <i class="fa-solid fa-globe text-xs text-sky-600"></i>
-          <span id="headerPortfolioText">mrsaqib242</span>
+          <span id="headerPortfolioText">mrsaqib.me</span>
         </a>
 
-        <!-- Direct WhatsApp Chat -->
+        <!-- Quick WhatsApp Chat -->
         <a
           id="headerWhatsAppBtn"
           href="https://wa.me/923464616487"
           target="_blank"
           rel="noopener noreferrer"
-          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer shadow-sm active:scale-95"
+          class="glass-pill px-2.5 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer shadow-xs active:scale-95"
+          title="Direct WhatsApp Chat"
         >
           <i class="fa-brands fa-whatsapp text-xs text-emerald-600"></i>
-          <span>Chat</span>
-        </a>
-
-        <!-- Instagram -->
-        <a
-          id="headerInstagramBtn"
-          href="https://www.instagram.com/mr_saqib242"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer shadow-sm active:scale-95"
-        >
-          <i class="fa-brands fa-instagram text-xs text-rose-600"></i>
-          <span>Instagram</span>
+          <span class="hidden sm:inline">Chat</span>
         </a>
       </div>
     </header>
@@ -1207,10 +1196,13 @@
           instagram: "https://www.instagram.com/mr_saqib242",
           facebook: "https://www.facebook.com/profile.php?id=100085188689033",
           tiktok: "https://www.tiktok.com/@mr_saqib_242",
-          snapchat: "https://www.snapchat.com/add/mrsaqib242",
-          portfolio: "https://mrsaqib242.vercel.app",
+          snapchat: "https://snapchat.com/add/mrsaqib242",
+          portfolio: "https://mrsaqib.me",
           badge_text: "Verified ID"
         };
+      } else {
+        // Enforce user's official domain
+        profile.portfolio = "https://mrsaqib.me";
       }
 
       // Populate Header Elements
@@ -1218,7 +1210,10 @@
       if (headerAvatar && profile.avatar) headerAvatar.src = profile.avatar;
 
       const headerCreatorLink = document.getElementById('headerCreatorLink');
-      if (headerCreatorLink && profile.name) headerCreatorLink.textContent = profile.name;
+      if (headerCreatorLink) {
+        headerCreatorLink.href = 'https://mrsaqib.me';
+        if (profile.name) headerCreatorLink.textContent = profile.name;
+      }
 
       const headerTagline = document.getElementById('headerTagline');
       if (headerTagline && profile.tagline) headerTagline.textContent = profile.tagline;
@@ -1227,13 +1222,10 @@
       if (headerBadge && profile.badge_text) headerBadge.textContent = profile.badge_text;
 
       const headerPortfolioBtn = document.getElementById('headerPortfolioBtn');
-      if (headerPortfolioBtn && profile.portfolio) {
-        headerPortfolioBtn.href = profile.portfolio;
-        try {
-          const u = new URL(profile.portfolio);
-          const hostEl = document.getElementById('headerPortfolioText');
-          if (hostEl) hostEl.textContent = u.hostname.replace('www.', '');
-        } catch (e) {}
+      if (headerPortfolioBtn) {
+        headerPortfolioBtn.href = 'https://mrsaqib.me';
+        const hostEl = document.getElementById('headerPortfolioText');
+        if (hostEl) hostEl.textContent = 'mrsaqib.me';
       }
 
       const headerWhatsAppBtn = document.getElementById('headerWhatsAppBtn');
@@ -1263,7 +1255,7 @@
       if (hubWaBtn && profile.whatsapp) hubWaBtn.href = profile.whatsapp;
 
       const hubPortfolioBtn = document.getElementById('hubPortfolioBtn');
-      if (hubPortfolioBtn && profile.portfolio) hubPortfolioBtn.href = profile.portfolio;
+      if (hubPortfolioBtn) hubPortfolioBtn.href = 'https://mrsaqib.me';
 
       const hubIgBtn = document.getElementById('hubIgBtn');
       if (hubIgBtn && profile.instagram) hubIgBtn.href = profile.instagram;
@@ -1273,15 +1265,10 @@
       if (footerName && profile.name) footerName.textContent = profile.name;
 
       const footerPortfolioLink = document.getElementById('footerPortfolioLink');
-      if (footerPortfolioLink && profile.portfolio) {
-        footerPortfolioLink.href = profile.portfolio;
+      if (footerPortfolioLink) {
+        footerPortfolioLink.href = 'https://mrsaqib.me';
         const footerPortText = document.getElementById('footerPortfolioText');
-        if (footerPortText) {
-          try {
-            const u = new URL(profile.portfolio);
-            footerPortText.textContent = u.hostname.replace('www.', '');
-          } catch (e) {}
-        }
+        if (footerPortText) footerPortText.textContent = 'mrsaqib.me';
       }
     }
     fetchContactProfile();
