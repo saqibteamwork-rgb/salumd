@@ -2025,33 +2025,37 @@ server.on('error', (err) => {
         console.error('⚠️ Server error:', err.message);
     }
 });
-server.listen(PORT, '0.0.0.0', () => {
-    console.log('\n' +
-    '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n' +
-    '   ⚡ ' + settings.botName + ' — SERVER ⚡\n' +
-    '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n\n' +
-    '  [■] Core Engine ......... booted\n' +
-    '  [■] Server .............. http://localhost:' + PORT + '\n' +
-    '  [■] Status ............... 🟢 ONLINE\n' +
-    '  [■] Anti-Sleep ........... enabled (5min)\n' +
-    '  [■] Owner ................ ' + settings.ownerName + '\n\n' +
-    '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n');
 
-    // Auto-load sessions
-    loadExistingSessions();
+// Only listen and run background sessions on Railway / VPS / Local (skip on Vercel Serverless)
+if (!process.env.VERCEL && !process.env.NOW_REGION) {
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log('\n' +
+        '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n' +
+        '   ⚡ ' + settings.botName + ' — SERVER ⚡\n' +
+        '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n\n' +
+        '  [■] Core Engine ......... booted\n' +
+        '  [■] Server .............. http://localhost:' + PORT + '\n' +
+        '  [■] Status ............... 🟢 ONLINE\n' +
+        '  [■] Anti-Sleep ........... enabled (5min)\n' +
+        '  [■] Owner ................ ' + settings.ownerName + '\n\n' +
+        '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n');
 
-    // Anti-Sleep Mechanism
-    const APP_URL = process.env.APP_URL || 'http://localhost:' + PORT;
-    if (APP_URL) {
-        setInterval(async () => {
-            try {
-                await axios.get(APP_URL);
-                console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲');
-            } catch (e) {
-                console.log('⚠️ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ ' + e.message);
-            }
-        }, 8 * 60 * 1000); // Ping every 5 minutes
-    }
-});
+        // Auto-load sessions
+        loadExistingSessions();
+
+        // Anti-Sleep Mechanism
+        const APP_URL = process.env.APP_URL || 'http://localhost:' + PORT;
+        if (APP_URL) {
+            setInterval(async () => {
+                try {
+                    await axios.get(APP_URL);
+                    console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲');
+                } catch (e) {
+                    console.log('⚠️ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ ' + e.message);
+                }
+            }, 8 * 60 * 1000); // Ping every 5 minutes
+        }
+    });
+}
 
 module.exports = app;
