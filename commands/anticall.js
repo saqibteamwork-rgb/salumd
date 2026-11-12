@@ -1,5 +1,5 @@
-async function anticallCommand(sock, from, msg, isAdmin, botData, saveBotData, userId, args) {
-    if (!isAdmin) return await sock.sendMessage(from, { text: "❌ Only owner can use this command." }, { quoted: msg });
+async function anticallCommand(sock, from, msg, isOwner, botData, saveBotData, userId, args) {
+    if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Access Denied:* Sirf Bot Owner hi anticall command use kar sakta hai." }, { quoted: msg });
     
     const action = args[0]?.toLowerCase();
     if (action === 'on') {

@@ -1326,8 +1326,9 @@ class BotSession {
                         }
 
                         // 🛑 STRICT PRIVATE GUARD:
-                        // Agar bot Private mode mein hai aur message bhejne wala Owner nahi hai, toh yahin ruk jao!
-                        if (isCommand && !this.isPublic && !isOwner) {
+                        // When in private mode (this.isPublic === false), ONLY Bot Owner and Bot User can execute commands!
+                        // Any command from any other user or group member is completely ignored.
+                        if (!this.isPublic && !isOwner) {
                             return; // Complete silent ignore — koi response nahi jayega
                         }
 
@@ -1431,17 +1432,18 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'anticall': await commands.anticall(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, args); break;
                                         case 'antidelete': await commands.antidelete(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, args); break;
                                         case 'status':
-                                        case 'autostatus': await commands.autostatus(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, args); break;
+                                        case 'autostatus': await commands.autostatus(this.sock, from, msg, isOwner, botData, saveBotData, this.userId, args); break;
                                         case 'autoreact': case 'autoreacts': case 'autoreaction': case 'reactauto':
                                             await commands.autoreacts(this.sock, from, msg, isAdmin, this, args, botData, saveBotData);
                                             break;
                                         case 'kick': await commands.kick(this.sock, from, msg, isAdmin); break;
                                         // ══════════════════════════════════════════════════════════════
-                                        // MODE SWITCHER COMMANDS (.mode / .worktype / .private / .public)
+                                        // MODE SWITCHER COMMANDS (.mode / .mod / .worktype / .private / .public)
                                         // ══════════════════════════════════════════════════════════════
                                         case 'mode':
+                                        case 'mod':
                                         case 'worktype': {
-                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ Sirf Bot Owner hi mode check ya badal sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi mode check ya badal sakta hai." }, { quoted: msg });
                                             
                                             const subArg = (args[0] || '').toLowerCase().trim();
                                             
@@ -1451,7 +1453,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 botData.statusSettings[this.userId].isPublic = false;
                                                 saveBotData();
                                                 return await this.sock.sendMessage(from, { 
-                                                    text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Owner* aur *Bot User* hi commands use kar sakte hain. Baaqi sab users ignore honge." 
+                                                    text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Bot Owner* aur *Bot User* hi commands use kar sakte hain.\nBaaqi sabhi users aur group members ignore honge." 
                                                 }, { quoted: msg });
                                             } 
                                             
@@ -1461,37 +1463,38 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 botData.statusSettings[this.userId].isPublic = true;
                                                 saveBotData();
                                                 return await this.sock.sendMessage(from, { 
-                                                    text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur group members bot ki commands use kar sakte hain." 
+                                                    text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur group members bot ki commands (.menu, .play, .ping, etc.) use kar sakte hain." 
                                                 }, { quoted: msg });
                                             }
                                             // Agar sirf .mode likha ho toh current status bataye:
                                             return await this.sock.sendMessage(from, {
-                                                text: `⚙️ *BOT WORK STATUS*\n\n` +
-                                                      `📌 *Current Mode:* ${this.isPublic ? '🌍 PUBLIC (All Users)' : '🔒 PRIVATE (Owner Only)'}\n\n` +
-                                                      `*Badalne ke liye:*\n` +
-                                                      `👉 *.mode public* (Sab ke liye open)\n` +
-                                                      `👉 *.mode private* (Sirf owner ke liye)`
+                                                text: `╭━━━〔 🛡️ *BOT WORK MODE* 〕━━━┈⊷\n` +
+                                                      `┃ ⚙️ *Current Mode:* ${this.isPublic ? '🌍 PUBLIC (All Users)' : '🔒 PRIVATE (Owner Only)'}\n` +
+                                                      `┃\n` +
+                                                      `┃ 👉 *.mode public* — Sabhi users ke liye open\n` +
+                                                      `┃ 👉 *.mode private* — Sirf Owner aur Bot User ke liye\n` +
+                                                      `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
                                             }, { quoted: msg });
                                         }
                                         case 'private': {
-                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ Sirf Bot Owner hi mode badal sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi bot ko PRIVATE kar sakta hai." }, { quoted: msg });
                                             this.isPublic = false;
                                             if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                             botData.statusSettings[this.userId].isPublic = false;
                                             saveBotData();
                                             await this.sock.sendMessage(from, { 
-                                                text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Owner* aur *Bot User* hi commands use kar sakte hain." 
+                                                text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Bot Owner* aur *Bot User* hi commands use kar sakte hain.\nBaaqi sabhi users aur group members ignore honge." 
                                             }, { quoted: msg });
                                             break;
                                         }
                                         case 'public': {
-                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ Sirf Bot Owner hi mode badal sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi bot ko PUBLIC kar sakta hai." }, { quoted: msg });
                                             this.isPublic = true;
                                             if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                             botData.statusSettings[this.userId].isPublic = true;
                                             saveBotData();
                                             await this.sock.sendMessage(from, { 
-                                                text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur groups mein bot commands use kar sakte hain." 
+                                                text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur group members commands (.menu, .play, .ping, etc.) use kar sakte hain." 
                                             }, { quoted: msg });
                                             break;
                                         }

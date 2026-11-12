@@ -7,8 +7,8 @@ const toBold = (text) => {
     return text.split('').map(c => boldChars[c] || c).join('');
 };
 
-async function statusCommand(sock, from, msg, isAdmin, botData, saveBotData, userId, args) {
-    if (!isAdmin) return await sock.sendMessage(from, { text: "❌ Only owner can use this command." }, { quoted: msg });
+async function statusCommand(sock, from, msg, isOwner, botData, saveBotData, userId, args) {
+    if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Access Denied:* Sirf Bot Owner hi yeh command use kar sakta hai." }, { quoted: msg });
     
     if (!botData.statusSettings[userId]) {
         botData.statusSettings[userId] = {
