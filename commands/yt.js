@@ -151,40 +151,49 @@ async function ytmp3Command(sock, from, msg, args = []) {
         const finalTitle = dlData.title || videoInfo.title || 'audio';
         const cleanTitle = finalTitle.replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
 
-        const adReplyContext = {
-            externalAdReply: {
-                title: finalTitle,
-                body: `${dlData.author || 'YouTube'} • ${settings.botName || 'MR SAQIB MD'}`,
-                thumbnailUrl: dlData.thumbnail || videoInfo.thumbnail || settings.websiteThumbnail,
-                sourceUrl: videoInfo.url,
-                mediaType: 2,
-                renderLargerThumbnail: true
-            }
-        };
-
-        // Ultra-Smooth: Direct streaming URL upload (Lightning Fast, No Heap Buffering)
-        try {
+        // 1. Send Beautiful Song Info Card with Cover Art (Visible to all users in chat/group)
+        const thumbUrl = dlData.thumbnail || videoInfo.thumbnail || settings.websiteThumbnail;
+        if (thumbUrl) {
             await sock.sendMessage(from, {
-                audio: { url: audioUrl },
-                mimetype: 'audio/mpeg',
-                fileName: `${cleanTitle}.mp3`,
-                ptt: false,
-                contextInfo: adReplyContext
-            }, { quoted: msg });
-        } catch (streamErr) {
-            // Buffer fallback if direct URL stream is blocked
-            console.warn('[YTMP3 Direct Stream Fallback]: Downloading buffer...');
+                image: { url: thumbUrl },
+                caption:
+`╭━━━〔 🎵 *MR SAQIB MD PLAYER* 〕━━━┈⊷
+┃ 📌 *Title:* ${finalTitle}
+┃ 👤 *Channel:* ${dlData.author || videoInfo.author || 'YouTube'}
+┃ ⏱️ *Duration:* ${videoInfo.duration || 'N/A'}
+┃ ⚡ *Status:* Sending Audio File...
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+            }, { quoted: msg }).catch(() => {});
+        }
+
+        // 2. Fetch Audio Buffer directly to ensure 100% WhatsApp media delivery to all users
+        let audioBuffer;
+        try {
             const audioRes = await axios.get(audioUrl, {
                 responseType: 'arraybuffer',
-                timeout: 45000,
-                headers: { 'User-Agent': USER_AGENTS[0] }
+                timeout: 50000,
+                headers: { 'User-Agent': USER_AGENTS[0], 'Accept': '*/*' }
             });
+            audioBuffer = Buffer.from(audioRes.data);
+        } catch (bufErr) {
+            console.warn('[YTMP3 Buffer Fetch Warning]:', bufErr.message);
+        }
+
+        // 3. Send Playable Audio (mimetype: 'audio/mp4' renders native playable wave player for EVERY user on Android & iOS)
+        if (audioBuffer && audioBuffer.length > 0) {
             await sock.sendMessage(from, {
-                audio: Buffer.from(audioRes.data),
-                mimetype: 'audio/mpeg',
+                audio: audioBuffer,
+                mimetype: 'audio/mp4',
                 fileName: `${cleanTitle}.mp3`,
-                ptt: false,
-                contextInfo: adReplyContext
+                ptt: false
+            }, { quoted: msg });
+        } else {
+            // Stream URL fallback if buffer fetch failed
+            await sock.sendMessage(from, {
+                audio: { url: audioUrl },
+                mimetype: 'audio/mp4',
+                fileName: `${cleanTitle}.mp3`,
+                ptt: false
             }, { quoted: msg });
         }
 
