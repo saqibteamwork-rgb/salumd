@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>SALU MD · Official WhatsApp Bot Hub</title>
+  <title>SALU MD · 3D Liquid Glass WhatsApp Bot Hub &amp; Pairing Center</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Google Fonts: Plus Jakarta Sans -->
+  <!-- Google Fonts: Fredoka (3D cartoon/graffiti) + Plus Jakarta Sans + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
   <!-- FontAwesome 6 Free CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -21,102 +21,277 @@
 
   <style>
     :root {
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --beige-canvas: #ddd8ce;
+      --beige-deep: #cbc4b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Plus Jakarta Sans', sans-serif;
     }
 
     body {
       margin: 0;
+      padding: 0;
       min-height: 100vh;
-      background:
-        radial-gradient(circle at 18% 15%, rgba(186, 230, 253, 0.45) 0%, transparent 40%),
-        radial-gradient(circle at 82% 18%, rgba(167, 243, 208, 0.40) 0%, transparent 42%),
-        radial-gradient(circle at 50% 50%, rgba(240, 253, 250, 0.85) 0%, transparent 60%),
-        radial-gradient(circle at 20% 85%, rgba(254, 215, 170, 0.20) 0%, transparent 40%),
-        radial-gradient(circle at 80% 85%, rgba(199, 210, 254, 0.25) 0%, transparent 40%),
-        linear-gradient(135deg, #e0f2fe 0%, #f0fdf9 48%, #e6f6fe 100%);
-      color: #0f172a;
+      background: radial-gradient(circle at 50% 25%, #e6e2d8 0%, #dbd5c9 55%, #cfc8ba 100%);
+      color: #18181b;
       overflow-x: hidden;
+      position: relative;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* 3D Acrylic Frosted Glass Slab */
-    .glass-slab {
+    /* Subtle Diagonal Watermark Pattern like Reference Wallpaper */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image: repeating-linear-gradient(
+        -28deg,
+        rgba(255, 255, 255, 0.04) 0px,
+        rgba(255, 255, 255, 0.04) 40px,
+        transparent 40px,
+        transparent 140px
+      );
+    }
+
+    /* Blurred Ambient Color Blobs behind Control Center for Glass Refraction */
+    .ambient-refraction-blob {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(48px);
+      pointer-events: none;
+      z-index: 0;
+      transition: all 0.7s ease;
+    }
+
+    /* 3D Molded Clear Liquid Glass Container (Squares, Cards & Capsules) */
+    .liquid-glass-box {
       position: relative;
       background: linear-gradient(
-        145deg,
-        rgba(255, 255, 255, 0.86) 0%,
-        rgba(255, 255, 255, 0.62) 50%,
-        rgba(255, 255, 255, 0.78) 100%
+        135deg,
+        rgba(255, 255, 255, 0.48) 0%,
+        rgba(244, 240, 232, 0.24) 50%,
+        rgba(255, 255, 255, 0.40) 100%
       );
-      backdrop-filter: blur(24px) saturate(190%);
-      -webkit-backdrop-filter: blur(24px) saturate(190%);
-      border-radius: 24px;
-      border: 1.8px solid rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 2.5px solid rgba(255, 255, 255, 0.90);
       box-shadow:
-        0 18px 36px -10px rgba(132, 176, 208, 0.28),
-        0 4px 12px -2px rgba(148, 187, 219, 0.15),
-        inset 0 1.5px 3px rgba(255, 255, 255, 0.98),
-        inset 0 -2px 6px rgba(255, 255, 255, 0.65);
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-      overflow: hidden;
+        0 18px 32px -8px rgba(45, 40, 32, 0.24),
+        0 4px 10px rgba(0, 0, 0, 0.08),
+        inset 0 3px 6px rgba(255, 255, 255, 0.95),
+        inset 0 -4px 8px rgba(70, 62, 50, 0.18),
+        inset 3px 0 6px rgba(130, 210, 255, 0.25),
+        inset -3px 0 6px rgba(255, 140, 210, 0.22);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease;
     }
 
-    .glass-slab:hover {
-      transform: translateY(-1.5px);
-      box-shadow:
-        0 22px 42px -10px rgba(125, 172, 206, 0.35),
-        0 6px 16px -3px rgba(148, 187, 219, 0.20),
-        inset 0 2px 4px rgba(255, 255, 255, 1);
-    }
-
-    .glass-slab::before {
-      content: "";
+    /* Inner Refractive Rim Line */
+    .liquid-glass-box::after {
+      content: '';
       position: absolute;
-      top: 0;
-      left: 6%;
-      right: 6%;
-      height: 1.2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+      inset: 3px;
+      border-radius: inherit;
+      border: 1.2px solid rgba(30, 30, 35, 0.14);
+      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.65);
       pointer-events: none;
-      z-index: 20;
     }
 
-    /* Frosted Glass Pill Badges */
-    .glass-pill {
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.60));
-      border: 1.2px solid rgba(255, 255, 255, 0.92);
+    /* Top Specular Gloss Arc */
+    .liquid-glass-box::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 12%;
+      right: 12%;
+      height: 14%;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .liquid-glass-box:hover {
+      transform: translateY(-2px);
       box-shadow:
-        0 3px 10px -2px rgba(148, 163, 184, 0.12),
-        inset 0 1px 2px rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(12px);
+        0 22px 36px -8px rgba(45, 40, 32, 0.30),
+        0 6px 14px rgba(0, 0, 0, 0.12),
+        inset 0 3px 6px rgba(255, 255, 255, 1),
+        inset 0 -4px 8px rgba(70, 62, 50, 0.22);
     }
 
-    /* Compact Circular Icon Container */
-    .icon-orb {
-      width: 36px;
-      height: 36px;
+    /* 3D Spherical Bubble Orb Base */
+    .glass-orb {
+      position: relative;
       border-radius: 9999px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1.2px solid rgba(255, 255, 255, 0.92);
+      cursor: pointer;
+      user-select: none;
+      border: 2px solid rgba(255, 255, 255, 0.88);
       box-shadow:
-        0 4px 10px -2px rgba(148, 163, 184, 0.18),
-        inset 0 1.5px 3px rgba(255, 255, 255, 0.92);
-      flex-shrink: 0;
+        0 12px 22px -4px rgba(35, 30, 22, 0.32),
+        0 3px 6px rgba(0, 0, 0, 0.14),
+        inset 0 4px 8px rgba(255, 255, 255, 0.92),
+        inset 0 -6px 10px rgba(0, 0, 0, 0.26);
+      transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
     }
 
-    /* Compact Neumorphic Gauge Well */
+    /* Glossy Crescent Highlight at Top-Left of Every Bubble Orb */
+    .glass-orb::before {
+      content: '';
+      position: absolute;
+      top: 6%;
+      left: 14%;
+      width: 56%;
+      height: 32%;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.05) 100%);
+      transform: rotate(-14deg);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* Bottom Inner Rim Bounce Light */
+    .glass-orb::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.38);
+      box-shadow: inset 0 -4px 6px rgba(255, 255, 255, 0.45);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .glass-orb:hover {
+      transform: scale(1.05) translateY(-2px);
+    }
+
+    .glass-orb:active {
+      transform: scale(0.93);
+    }
+
+    /* Orb Color Variants matching the 3D Liquid Glass Reference */
+    .orb-blue {
+      background: radial-gradient(circle at 35% 30%, #5b7fff 0%, #2b44b8 62%, #1a297a 100%);
+      color: #ffffff;
+      box-shadow:
+        0 12px 24px -4px rgba(37, 60, 175, 0.55),
+        inset 0 4px 8px rgba(255, 255, 255, 0.9),
+        inset 0 -6px 12px rgba(10, 18, 68, 0.65);
+    }
+
+    .orb-red {
+      background: radial-gradient(circle at 35% 30%, #ff7563 0%, #d93d2a 65%, #961f12 100%);
+      color: #111111;
+      box-shadow:
+        0 12px 24px -4px rgba(210, 55, 38, 0.52),
+        inset 0 4px 8px rgba(255, 255, 255, 0.88),
+        inset 0 -6px 12px rgba(95, 16, 8, 0.6);
+    }
+
+    .orb-green {
+      background: radial-gradient(circle at 35% 30%, #48b899 0%, #1d755d 65%, #0f4737 100%);
+      color: #0b1713;
+      box-shadow:
+        0 12px 24px -4px rgba(26, 115, 90, 0.5),
+        inset 0 4px 8px rgba(255, 255, 255, 0.85),
+        inset 0 -6px 12px rgba(8, 48, 36, 0.65);
+    }
+
+    .orb-amber {
+      background: radial-gradient(circle at 35% 30%, #ffd25a 0%, #e5a024 65%, #b07008 100%);
+      color: #141414;
+      box-shadow:
+        0 12px 24px -4px rgba(224, 155, 30, 0.5),
+        inset 0 4px 8px rgba(255, 255, 255, 0.92),
+        inset 0 -6px 12px rgba(135, 80, 0, 0.55);
+    }
+
+    .orb-champagne {
+      background: radial-gradient(circle at 35% 30%, rgba(255, 248, 232, 0.82) 0%, rgba(226, 202, 165, 0.66) 68%, rgba(198, 170, 128, 0.82) 100%);
+      backdrop-filter: blur(12px);
+      color: #0f0f0f;
+      box-shadow:
+        0 12px 22px -5px rgba(85, 72, 52, 0.32),
+        inset 0 4px 8px rgba(255, 255, 255, 0.96),
+        inset 0 -6px 10px rgba(120, 95, 62, 0.38);
+    }
+
+    .orb-clear {
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.78) 0%, rgba(215, 222, 232, 0.45) 65%, rgba(182, 192, 206, 0.65) 100%);
+      backdrop-filter: blur(14px);
+      color: #0f0f0f;
+      box-shadow:
+        0 12px 22px -5px rgba(55, 62, 75, 0.32),
+        inset 0 4px 9px rgba(255, 255, 255, 0.98),
+        inset 0 -5px 10px rgba(70, 82, 102, 0.35),
+        inset 3px 0 6px rgba(120, 200, 255, 0.35),
+        inset -3px 0 6px rgba(255, 150, 210, 0.3);
+    }
+
+    .orb-rainbow {
+      background: conic-gradient(
+        from 210deg at 50% 50%,
+        #3b82f6 0deg,
+        #6366f1 70deg,
+        #ec4899 140deg,
+        #f59e0b 215deg,
+        #10b981 290deg,
+        #3b82f6 360deg
+      );
+      color: #09090b;
+      box-shadow:
+        0 12px 24px -4px rgba(99, 102, 241, 0.48),
+        inset 0 4px 9px rgba(255, 255, 255, 0.92),
+        inset 0 -6px 12px rgba(17, 24, 39, 0.45);
+    }
+
+    /* 3D Cartoon Graffiti Block Typography */
+    .cartoon-letter {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      display: inline-block;
+      -webkit-text-stroke: 2.2px #111111;
+      paint-order: stroke fill;
+      text-shadow:
+        2px 3px 0px #111111,
+        0px 5px 10px rgba(0, 0, 0, 0.25);
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .cartoon-letter:hover {
+      transform: translateY(-4px) rotate(-6deg) scale(1.10);
+    }
+
+    .sticker-word {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      -webkit-text-stroke: 2px #1e1b4b;
+      paint-order: stroke fill;
+      text-shadow: 2px 2px 0px #1e1b4b;
+    }
+
+    /* Neumorphic Gauge Well */
     .gauge-well-mini {
       position: relative;
-      width: 64px;
-      height: 64px;
+      width: 62px;
+      height: 62px;
       border-radius: 9999px;
       background: linear-gradient(145deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.28));
       box-shadow:
-        0 6px 14px -3px rgba(148, 163, 184, 0.14),
+        0 6px 14px -3px rgba(148, 163, 184, 0.20),
         inset 0 1.5px 3px rgba(255, 255, 255, 0.9);
-      border: 1.2px solid rgba(255, 255, 255, 0.78);
+      border: 1.5px solid rgba(255, 255, 255, 0.85);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -124,14 +299,14 @@
     }
 
     .gauge-core-mini {
-      width: 48px;
-      height: 48px;
+      width: 46px;
+      height: 46px;
       border-radius: 9999px;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.52));
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
       box-shadow:
-        0 3px 8px rgba(15, 23, 42, 0.03),
+        0 3px 8px rgba(15, 23, 42, 0.05),
         inset 0 1px 2px rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.9);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -142,30 +317,33 @@
       transition: stroke-dashoffset 0.65s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    /* Pairing Code Box */
+    /* 3D Liquid Pairing Code Display Card */
     .pairing-box {
       font-family: 'JetBrains Mono', monospace;
-      letter-spacing: 0.14em;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(240, 253, 250, 0.88));
-      border: 1.8px dashed rgba(16, 185, 129, 0.45);
+      letter-spacing: 0.16em;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(244, 252, 248, 0.90));
+      border: 2px dashed rgba(26, 115, 90, 0.55);
       box-shadow:
-        0 8px 20px -4px rgba(16, 185, 129, 0.18),
-        inset 0 1.5px 3px rgba(255, 255, 255, 0.95);
+        0 14px 28px -6px rgba(26, 115, 90, 0.22),
+        inset 0 2px 4px rgba(255, 255, 255, 1),
+        inset 0 -2px 6px rgba(0, 0, 0, 0.05);
       transition: all 0.25s ease;
     }
     .pairing-box:hover {
-      border-color: rgba(16, 185, 129, 0.85);
-      transform: scale(1.01);
-      box-shadow: 0 12px 24px -4px rgba(16, 185, 129, 0.25);
+      border-color: rgba(26, 115, 90, 0.95);
+      transform: scale(1.015);
+      box-shadow: 0 18px 32px -4px rgba(26, 115, 90, 0.32);
     }
 
-    /* Terminal Console */
+    /* Dark Glass Terminal Console */
     .terminal-console {
       font-family: 'JetBrains Mono', monospace;
-      background: rgba(15, 23, 42, 0.90);
+      background: rgba(18, 24, 38, 0.92);
       backdrop-filter: blur(18px);
-      border: 1.2px solid rgba(255, 255, 255, 0.15);
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      box-shadow:
+        inset 0 3px 8px rgba(0, 0, 0, 0.5),
+        0 8px 20px -4px rgba(15, 23, 42, 0.25);
     }
 
     ::-webkit-scrollbar {
@@ -173,241 +351,311 @@
       height: 4px;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.4);
+      background: rgba(120, 113, 108, 0.5);
       border-radius: 9999px;
     }
   </style>
 </head>
-<body class="py-4 px-3 sm:px-5 md:py-7 flex flex-col items-center justify-center min-h-screen">
 
-  <!-- Ambient Glow Blobs -->
-  <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-    <div class="absolute top-[5%] left-[12%] w-72 h-72 rounded-full bg-emerald-200/30 blur-3xl"></div>
-    <div class="absolute top-[8%] right-[12%] w-72 h-72 rounded-full bg-sky-200/35 blur-3xl"></div>
-    <div class="absolute bottom-[10%] left-[15%] w-64 h-64 rounded-full bg-orange-200/20 blur-3xl"></div>
-    <div class="absolute bottom-[8%] right-[15%] w-64 h-64 rounded-full bg-indigo-200/25 blur-3xl"></div>
+<body class="py-4 px-3 sm:px-5 md:py-8 flex flex-col items-center justify-center min-h-screen selection:bg-amber-300 selection:text-zinc-900">
+
+  <!-- Ambient Refracted Color Blobs Behind Glass for Liquid Depth -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0 flex items-center justify-center">
+    <div class="relative w-full max-w-[850px] h-[950px]">
+      <div class="ambient-refraction-blob w-72 h-72 bg-amber-400/35 top-12 -left-12"></div>
+      <div class="ambient-refraction-blob w-80 h-80 bg-teal-600/30 top-56 right-8"></div>
+      <div class="ambient-refraction-blob w-72 h-72 bg-sky-500/30 bottom-36 left-16"></div>
+      <div class="ambient-refraction-blob w-64 h-64 bg-rose-400/25 bottom-12 right-20"></div>
+    </div>
   </div>
 
-  <!-- MAIN CONTAINER (Max width 820px, compact & centered) -->
-  <main class="w-full max-w-[820px] space-y-4 sm:space-y-5">
+  <!-- MAIN CONTAINER (Max width 820px, Centered Liquid Glass Hub) -->
+  <main class="relative z-10 w-full max-w-[820px] space-y-4 sm:space-y-5">
 
     <!-- ================================================================= -->
-    <!-- 1. SLIM & COMPACT TOP HEADER                                      -->
+    <!-- 1. FLOATING 3D LIQUID GLASS IDENTITY HEADER                       -->
     <!-- ================================================================= -->
-    <header class="glass-slab px-3.5 py-2.5 sm:px-5 sm:py-3 flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
-        <!-- User Official DP Avatar (Dynamically fetched from API) -->
+    <header class="liquid-glass-box rounded-full px-3.5 py-2.5 sm:px-5 sm:py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 sm:gap-3.5 min-w-0 z-10">
+        <!-- User Official Avatar in Glass Ring -->
         <div class="relative flex-shrink-0">
-          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-gradient-to-tr from-emerald-500 via-teal-400 to-sky-500 shadow-sm">
+          <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-teal-400 to-sky-500 shadow-md">
             <img
               id="headerAvatar"
               src="https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp"
               alt="SALU MD"
-              class="w-full h-full object-cover rounded-full border border-white"
+              class="w-full h-full object-cover rounded-full border-2 border-white"
             />
           </div>
-          <!-- Online Status Badge -->
-          <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-200/60 animate-pulse"></span>
+          <!-- 3D Pulsing Online Badge -->
+          <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-xs animate-ping"></span>
+          <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-xs"></span>
         </div>
 
         <div class="min-w-0">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <h1 class="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight leading-none">SALU MD</h1>
-            <span id="headerBadge" class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
-              Verified ID
+            <h1 class="text-xs sm:text-sm md:text-base font-extrabold text-zinc-900 tracking-tight leading-none">SALU MD</h1>
+            <span id="headerBadge" class="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/20 text-emerald-950 border border-emerald-500/40 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Verified ID
             </span>
           </div>
-          <p class="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate mt-0.5">
-            Created by <span id="headerCreatorLink" class="text-emerald-700 font-bold">SALU</span> · <span id="headerTagline">Full-Stack & Security</span>
+          <p class="text-[10px] sm:text-[11px] font-bold text-zinc-600 truncate mt-0.5">
+            Created by <span id="headerCreatorLink" class="text-teal-800 font-extrabold">SALU</span> · <span id="headerTagline">Full-Stack &amp; Cyber Security OS</span>
           </p>
         </div>
       </div>
 
-      <!-- Action Links: Quick WhatsApp -->
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <!-- Quick WhatsApp Chat -->
+      <!-- Action Buttons: Audio Pop Toggle + WhatsApp -->
+      <div class="flex items-center gap-2 flex-shrink-0 z-10">
+        <!-- Audio Synth Bubble Pop Button -->
+        <button
+          onclick="toggleSound()"
+          class="glass-orb orb-clear w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm"
+          title="Toggle Bubble Pop Audio"
+        >
+          <i id="sound-icon" class="fa-solid fa-volume-high text-zinc-900"></i>
+        </button>
+
+        <!-- Direct WhatsApp Chat -->
         <a
           id="headerWhatsAppBtn"
-          href="https://wa.me/923464616487"
+          href="https://wa.me/923468616487"
           target="_blank"
           rel="noopener noreferrer"
-          class="glass-pill px-2.5 py-1.5 rounded-full flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer shadow-xs active:scale-95"
+          onclick="playBubblePop(680)"
+          class="glass-orb orb-green px-3.5 py-1.5 text-xs font-black text-white flex items-center gap-1.5 shadow-md"
           title="Direct WhatsApp Chat"
         >
-          <i class="fa-brands fa-whatsapp text-xs text-emerald-600"></i>
-          <span class="hidden sm:inline">Chat</span>
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span class="hidden sm:inline">WhatsApp</span>
         </a>
       </div>
     </header>
 
     <!-- ================================================================= -->
-    <!-- 2. HERO PAIRING & QR WORKSPACE (Enlarged, Centered Main Focus)    -->
+    <!-- 2. HERO 3D LIQUID GLASS WHATSAPP PAIRING & LINKER WORKSPACE       -->
     <!-- ================================================================= -->
-    <section class="glass-slab p-5 sm:p-7 md:p-8 rounded-3xl relative overflow-hidden shadow-2xl shadow-emerald-500/10 border-2 border-white/90 ring-1 ring-emerald-500/20">
-      <!-- Ambient Inner Backdrop Glow -->
-      <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-48 bg-gradient-to-b from-emerald-400/25 to-teal-400/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div class="relative z-10 max-w-2xl mx-auto">
-        <!-- Centered Header -->
-        <div class="text-center mb-6">
-          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50/90 border border-emerald-200 text-emerald-800 text-xs font-black mb-2 shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Instant Bot Linker · 24/7 Active</span>
+    <section class="liquid-glass-box rounded-[38px] p-5 sm:p-7 md:p-8 relative overflow-hidden">
+      
+      <!-- Top Center: Playful 3D Cartoon Brand Logo (S A L U) + Dynamic Golden Swoosh -->
+      <div class="relative z-10 max-w-2xl mx-auto text-center mb-5 sm:mb-6">
+        
+        <div onclick="playBubblePop(720)" class="inline-flex flex-col items-center cursor-pointer select-none mb-3" title="SALU MD 3D Control Center">
+          <div class="flex items-center justify-center tracking-tight text-[36px] sm:text-[44px] leading-none">
+            <span class="cartoon-letter text-[#2e45b8] -rotate-12">s</span>
+            <span class="cartoon-letter text-[#e03c28] -rotate-3 -ml-0.5">a</span>
+            <span class="cartoon-letter text-[#f5ecd7] rotate-6 -ml-0.5">l</span>
+            <span class="cartoon-letter text-[#278c68] -rotate-6 -ml-0.5">u</span>
+            <span class="cartoon-letter text-[#f2b726] rotate-12 ml-1 text-[26px] sm:text-[32px]">MD</span>
           </div>
-          <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-            Connect Your WhatsApp
-          </h2>
-          <p class="text-xs sm:text-sm text-slate-500 font-semibold mt-1.5 max-w-md mx-auto">
-            Pair your number with 8-digit code or scan QR code instantly with zero wait time.
-          </p>
+
+          <!-- Dynamic 3D Golden Swoosh SVG -->
+          <svg class="w-36 sm:w-44 h-9 sm:h-10 -mt-2 sm:-mt-2.5 drop-shadow-[0_3px_2px_rgba(0,0,0,0.35)]" viewBox="0 0 220 65" fill="none">
+            <defs>
+              <linearGradient id="goldSwooshGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#fffbeb" />
+                <stop offset="45%" stop-color="#fbbf24" />
+                <stop offset="100%" stop-color="#d97706" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M36 22 C18 38, 18 58, 52 54 C95 49, 158 26, 210 10 C152 34, 88 46, 56 42 C36 40, 32 30, 36 22 Z"
+              fill="url(#goldSwooshGrad)"
+              stroke="#111111"
+              stroke-width="4"
+              stroke-linejoin="round"
+            />
+          </svg>
         </div>
 
-        <!-- Centered Tab Selector -->
-        <div class="flex justify-center mb-6">
-          <div class="glass-pill p-1.5 rounded-2xl flex items-center gap-1.5 shadow-sm border border-slate-200/80 bg-white/70">
-            <button
-              id="tabCodeBtn"
-              onclick="switchPairTab('code')"
-              class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95"
-            >
-              <i class="fa-solid fa-key text-xs"></i>
-              <span>8-Digit Pair Code</span>
-            </button>
-            <button
-              id="tabQrBtn"
-              onclick="switchPairTab('qr')"
-              class="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95"
-            >
-              <i class="fa-solid fa-qrcode text-xs"></i>
-              <span>QR Code Scan</span>
-            </button>
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/70 border border-emerald-500/40 text-emerald-950 text-xs font-black mb-2 shadow-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+          <span>Instant Bot Linker · 24/7 Active</span>
+        </div>
+
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-zinc-900 tracking-tight">
+          Connect Your WhatsApp
+        </h2>
+        <p class="text-xs sm:text-sm text-zinc-600 font-bold mt-1.5 max-w-md mx-auto">
+          Pair your number with 8-digit code or scan QR code instantly with zero wait time.
+        </p>
+      </div>
+
+      <!-- Center Tab Selector in Molded Capsule -->
+      <div class="relative z-10 flex justify-center mb-6">
+        <div class="liquid-glass-box rounded-full p-1.5 flex items-center gap-1.5 shadow-sm">
+          <button
+            id="tabCodeBtn"
+            onclick="switchPairTab('code'); playBubblePop(540);"
+            class="glass-orb orb-green px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-white flex items-center gap-2 shadow-md"
+          >
+            <i class="fa-solid fa-key text-xs"></i>
+            <span>8-Digit Pair Code</span>
+          </button>
+          <button
+            id="tabQrBtn"
+            onclick="switchPairTab('qr'); playBubblePop(580);"
+            class="px-5 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-zinc-700 hover:text-zinc-950 hover:bg-white/60 cursor-pointer active:scale-95"
+          >
+            <i class="fa-solid fa-qrcode text-xs"></i>
+            <span>QR Code Scan</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 1: PAIRING CODE (Main Hero Focus) -->
+      <div id="pairingCodeTab" class="relative z-10 max-w-xl mx-auto space-y-4">
+        <!-- Input + Large CTA Button -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div class="relative w-full flex-1">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-teal-700">
+              <i class="fa-solid fa-phone text-sm"></i>
+            </div>
+            <input
+              type="tel"
+              id="phoneInput"
+              placeholder="Enter WhatsApp number (e.g. 923001234567)"
+              value=""
+              class="w-full pl-11 pr-4 py-3.5 sm:py-4 rounded-full bg-white/80 border-2 border-white focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-500/20 focus:outline-none text-zinc-900 font-extrabold placeholder-zinc-400 text-sm sm:text-base shadow-inner transition"
+            />
+          </div>
+          <button
+            id="pairBtn"
+            onclick="playBubblePop(640)"
+            class="glass-orb orb-green w-full sm:w-auto px-7 sm:px-9 py-3.5 sm:py-4 rounded-full text-white font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
+          >
+            <i class="fa-solid fa-bolt text-sm"></i>
+            <span id="pairBtnText">Get Code</span>
+          </button>
+        </div>
+
+        <!-- Pairing Code Display Card (3D Molded Glass) -->
+        <div id="codeResultArea" class="hidden pt-2">
+          <div onclick="playBubblePop(760)" class="pairing-box rounded-[28px] p-5 sm:p-6 text-center cursor-pointer relative group">
+            <span class="text-xs font-black text-emerald-900 uppercase tracking-widest block mb-1">
+              Your 8-Digit Pairing Code (Tap to Copy)
+            </span>
+            <div id="codeDisplay" class="text-3xl sm:text-4xl md:text-5xl font-black text-zinc-900 my-2 select-all tracking-[0.25em] font-mono leading-tight">
+              WAITING...
+            </div>
+            <div class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 border border-emerald-400 text-xs text-emerald-900 font-extrabold shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition">
+              <i class="fa-regular fa-copy"></i>
+              <span id="copyFeedback">Tap anywhere to copy code</span>
+            </div>
+          </div>
+
+          <!-- Instructions Pill -->
+          <div class="mt-3.5 p-3.5 rounded-2xl bg-white/70 border border-white text-xs text-zinc-700 space-y-1.5 shadow-xs">
+            <div class="font-extrabold text-zinc-900 flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+              <span>How to link in WhatsApp:</span>
+            </div>
+            <p class="leading-relaxed font-semibold">
+              Open WhatsApp &gt; <strong>Linked Devices</strong> &gt; <strong>Link with phone number instead</strong> &gt; Enter the 8-digit code above.
+            </p>
           </div>
         </div>
 
-        <!-- TAB 1: PAIRING CODE (Main Hero Focus) -->
-        <div id="pairingCodeTab" class="space-y-4">
-          <!-- Input + Large CTA Button -->
-          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div class="relative w-full flex-1">
-              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-emerald-600">
-                <i class="fa-solid fa-phone text-sm"></i>
-              </div>
-              <input
-                type="tel"
-                id="phoneInput"
-                placeholder="Enter WhatsApp number (e.g. 923001234567)"
-                value=""
-                class="w-full pl-11 pr-4 py-3.5 sm:py-4 rounded-2xl bg-white border-2 border-slate-200/90 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 focus:outline-none text-slate-900 font-extrabold placeholder-slate-400 text-sm sm:text-base shadow-sm transition"
-              />
-            </div>
-            <button
-              id="pairBtn"
-              class="w-full sm:w-auto px-7 sm:px-9 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-black text-sm sm:text-base shadow-lg shadow-teal-500/30 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
-            >
-              <i class="fa-solid fa-bolt text-sm"></i>
-              <span id="pairBtnText">Get Code</span>
-            </button>
-          </div>
-
-          <!-- Pairing Code Display Card (Large, Bold, Centered) -->
-          <div id="codeResultArea" class="hidden pt-2">
-            <div class="pairing-box rounded-2xl p-5 sm:p-6 text-center cursor-pointer relative group border-2 border-dashed border-emerald-400/90 bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-white shadow-inner">
-              <span class="text-xs font-black text-emerald-800 uppercase tracking-widest block mb-1">
-                Your 8-Digit Pairing Code (Tap to Copy)
-              </span>
-              <div id="codeDisplay" class="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 my-2 select-all tracking-[0.25em] font-mono leading-tight">
-                WAITING...
-              </div>
-              <div class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 border border-emerald-300 text-xs text-emerald-700 font-bold shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition">
-                <i class="fa-regular fa-copy"></i>
-                <span id="copyFeedback">Tap anywhere to copy code</span>
-              </div>
-            </div>
-
-            <!-- Instructions -->
-            <div class="mt-3.5 p-3.5 rounded-2xl bg-white/80 border border-slate-200/90 text-xs text-slate-600 space-y-1.5 shadow-sm">
-              <div class="font-bold text-slate-900 flex items-center gap-1.5">
-                <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
-                <span>How to link in WhatsApp:</span>
-              </div>
-              <p class="leading-relaxed">
-                Open WhatsApp &gt; <strong>Linked Devices</strong> &gt; <strong>Link with phone number instead</strong> &gt; Enter the 8-digit code above.
-              </p>
-            </div>
-          </div>
-
-          <!-- Status Alert -->
-          <div id="connStatusBox" class="hidden p-3 rounded-2xl border text-xs sm:text-sm font-bold flex items-center gap-2.5 transition shadow-sm">
-            <i id="connStatusIcon" class="fa-solid fa-spinner fa-spin text-base"></i>
-            <span id="connStatusMsg">Waiting for code entry...</span>
-          </div>
-
-          <!-- Flow Guide (2-Column Grid on Mobile, 4-Column on Desktop, Extra-Compact & Clean) -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-2 border-t border-slate-200/70 text-center">
-            <div class="py-1.5 px-2 rounded-lg bg-white/70 border border-slate-200/70 shadow-2xs">
-              <span class="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">Step 1</span>
-              <span class="text-[10.5px] sm:text-[11px] font-extrabold text-slate-800 block truncate">Enter Number</span>
-            </div>
-            <div class="py-1.5 px-2 rounded-lg bg-white/70 border border-slate-200/70 shadow-2xs">
-              <span class="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">Step 2</span>
-              <span class="text-[10.5px] sm:text-[11px] font-extrabold text-slate-800 block truncate">Tap "Get Code"</span>
-            </div>
-            <div class="py-1.5 px-2 rounded-lg bg-white/70 border border-slate-200/70 shadow-2xs">
-              <span class="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">Step 3</span>
-              <span class="text-[10.5px] sm:text-[11px] font-extrabold text-slate-800 block truncate">Open WhatsApp</span>
-            </div>
-            <div class="py-1.5 px-2 rounded-lg bg-white/70 border border-slate-200/70 shadow-2xs">
-              <span class="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">Step 4</span>
-              <span class="text-[10.5px] sm:text-[11px] font-extrabold text-slate-800 block truncate">Link Device</span>
-            </div>
-          </div>
+        <!-- Connection Status Alert -->
+        <div id="connStatusBox" class="hidden p-3 rounded-2xl border text-xs sm:text-sm font-bold flex items-center gap-2.5 transition shadow-sm">
+          <i id="connStatusIcon" class="fa-solid fa-spinner fa-spin text-base"></i>
+          <span id="connStatusMsg">Waiting for code entry...</span>
         </div>
 
-        <!-- TAB 2: QR CODE SCAN (Centered & Prominent) -->
-        <div id="qrCodeTab" class="hidden space-y-4">
-          <div class="flex flex-col items-center justify-center py-3">
-            <button
-              id="qrGenBtn"
-              class="px-7 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-black text-sm shadow-lg shadow-teal-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer mb-4"
-            >
-              <i class="fa-solid fa-qrcode text-sm"></i>
-              <span id="qrGenBtnText">Generate QR Code</span>
-            </button>
-
-            <div id="qrDisplayContainer" class="hidden p-4 rounded-3xl bg-white shadow-xl border-2 border-slate-200 flex flex-col items-center">
-              <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="w-56 h-56 rounded-xl" />
-              <p class="text-xs text-slate-600 font-bold mt-3 flex items-center gap-1.5">
-                <i class="fa-solid fa-camera text-emerald-500"></i>
-                <span>WhatsApp &gt; Linked Devices se scan karein</span>
-              </p>
-            </div>
+        <!-- 4-Step Flow Guide (Liquid Glass Mini-Pills) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 mt-2 border-t border-zinc-900/10 text-center">
+          <div class="py-2 px-2.5 rounded-xl bg-white/60 border border-white shadow-xs">
+            <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Step 1</span>
+            <span class="text-[11px] font-black text-zinc-900 block truncate">Enter Number</span>
+          </div>
+          <div class="py-2 px-2.5 rounded-xl bg-white/60 border border-white shadow-xs">
+            <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Step 2</span>
+            <span class="text-[11px] font-black text-zinc-900 block truncate">Tap "Get Code"</span>
+          </div>
+          <div class="py-2 px-2.5 rounded-xl bg-white/60 border border-white shadow-xs">
+            <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Step 3</span>
+            <span class="text-[11px] font-black text-zinc-900 block truncate">Open WhatsApp</span>
+          </div>
+          <div class="py-2 px-2.5 rounded-xl bg-white/60 border border-white shadow-xs">
+            <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Step 4</span>
+            <span class="text-[11px] font-black text-zinc-900 block truncate">Link Device</span>
           </div>
         </div>
       </div>
+
+      <!-- TAB 2: QR CODE SCAN (Centered & Prominent) -->
+      <div id="qrCodeTab" class="hidden relative z-10 max-w-xl mx-auto space-y-4">
+        <div class="flex flex-col items-center justify-center py-3">
+          <button
+            id="qrGenBtn"
+            onclick="playBubblePop(620)"
+            class="glass-orb orb-blue px-7 py-3 rounded-full text-white font-black text-sm shadow-xl flex items-center gap-2 cursor-pointer mb-4"
+          >
+            <i class="fa-solid fa-qrcode text-sm"></i>
+            <span id="qrGenBtnText">Generate QR Code</span>
+          </button>
+
+          <div id="qrDisplayContainer" class="hidden p-4 rounded-3xl bg-white/90 shadow-2xl border-2 border-white flex flex-col items-center">
+            <img id="qrImageElement" src="" alt="WhatsApp QR Code" class="w-56 h-56 rounded-2xl" />
+            <p class="text-xs text-zinc-700 font-extrabold mt-3 flex items-center gap-1.5">
+              <i class="fa-solid fa-camera text-emerald-600"></i>
+              <span>WhatsApp &gt; Linked Devices se scan karein</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. INTERACTIVE 3D BUBBLE ORB TOGGLES (Reference Image Exact Orbs) -->
+      <div class="relative z-10 pt-5 mt-4 border-t border-zinc-900/10">
+        <div class="text-center mb-3">
+          <span class="text-[10px] font-black uppercase tracking-wider text-zinc-600">
+            ⚡ Quick Cyber Control Deck
+          </span>
+        </div>
+        <div class="grid grid-cols-4 gap-3 max-w-md mx-auto">
+          <!-- Blue Orb: Stealth Cloak / Privacy Guard -->
+          <button onclick="playBubblePop(520)" class="glass-orb orb-blue aspect-square w-full text-xl sm:text-2xl" title="Stealth Mode / Encrypted Tunnel">
+            <i class="fa-solid fa-plane-up -rotate-45 text-white drop-shadow"></i>
+          </button>
+          <!-- Red Orb: Live Packet Stream / Anti-Sleep -->
+          <button onclick="playBubblePop(560)" class="glass-orb orb-red aspect-square w-full text-lg sm:text-xl" title="Live Telemetry Stream Active">
+            <i class="fa-solid fa-arrow-right-arrow-left rotate-90 text-zinc-950"></i>
+          </button>
+          <!-- Teal Orb: Wi-Fi 7 / WAF Bot Shield -->
+          <button onclick="playBubblePop(600)" class="glass-orb orb-green aspect-square w-full text-lg sm:text-xl" title="Bot Anti-Ban Shield Active">
+            <i class="fa-solid fa-shield-halved text-zinc-950"></i>
+          </button>
+          <!-- Amber Orb: AI Agent Mesh Sync -->
+          <button onclick="playBubblePop(640)" class="glass-orb orb-amber aspect-square w-full text-lg sm:text-xl" title="AI Agent Engine Ready">
+            <i class="fa-solid fa-microchip text-zinc-950"></i>
+          </button>
+        </div>
+      </div>
+
     </section>
 
     <!-- ================================================================= -->
-    <!-- 3. COMPACT 2-COLUMN MOBILE TELEMETRY GRID (Exact User Request)    -->
+    <!-- 3. COMPACT 4-CARD 3D LIQUID GLASS TELEMETRY GRID                  -->
     <!-- ================================================================= -->
     <section class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5">
 
       <!-- CARD 1: BATTERY -->
-      <article class="glass-slab p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
-        <div class="flex items-center justify-between">
-          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #ecfdf5 0%, #bbf7d0 70%, #86efac 100%);">
-            <i id="batteryIcon" class="fa-solid fa-battery-three-quarters text-emerald-700 text-sm"></i>
+      <article class="liquid-glass-box rounded-[28px] p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
+        <div class="flex items-center justify-between z-10">
+          <div class="glass-orb orb-green w-9 h-9 text-xs">
+            <i id="batteryIcon" class="fa-solid fa-battery-three-quarters text-zinc-950"></i>
           </div>
-          <span id="batteryStatusText" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span id="batteryStatusText" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/70 text-emerald-950 border border-white">
             Battery
           </span>
         </div>
 
-        <div class="flex items-end justify-between mt-2">
+        <div class="flex items-end justify-between mt-2 z-10">
           <div>
-            <div id="batteryLevelDisplay" class="text-2xl font-extrabold text-slate-900 tracking-tight leading-none">
+            <div id="batteryLevelDisplay" class="text-2xl font-black text-zinc-900 tracking-tight leading-none">
               --%
             </div>
-            <div id="batteryChargingText" class="text-[10px] font-semibold text-slate-500 mt-1 truncate">
+            <div id="batteryChargingText" class="text-[10px] font-bold text-zinc-600 mt-1 truncate">
               Detecting
             </div>
           </div>
@@ -415,7 +663,7 @@
           <!-- Mini Gauge -->
           <div class="gauge-well-mini">
             <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 64 64">
-              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(167, 243, 208, 0.45)" stroke-width="5" />
+              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255, 255, 255, 0.45)" stroke-width="5" />
               <circle
                 id="batteryArc"
                 class="progress-arc"
@@ -423,7 +671,7 @@
                 cy="32"
                 r="24"
                 fill="none"
-                stroke="#10b981"
+                stroke="#1d755d"
                 stroke-width="5"
                 stroke-linecap="round"
                 stroke-dasharray="150.79"
@@ -431,36 +679,36 @@
               />
             </svg>
             <div class="gauge-core-mini">
-              <i class="fa-solid fa-bolt text-emerald-600 text-xs"></i>
+              <i class="fa-solid fa-bolt text-teal-800 text-xs"></i>
             </div>
           </div>
         </div>
       </article>
 
-      <!-- CARD 2: LIVE PUBLIC IP & NETWORK (Requested by User) -->
-      <article class="glass-slab p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
-        <div class="flex items-center justify-between">
-          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #f0f9ff 0%, #bae6fd 70%, #7dd3fc 100%);">
-            <i class="fa-solid fa-network-wired text-sky-700 text-sm"></i>
+      <!-- CARD 2: LIVE PUBLIC IP & NETWORK PING -->
+      <article class="liquid-glass-box rounded-[28px] p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
+        <div class="flex items-center justify-between z-10">
+          <div class="glass-orb orb-blue w-9 h-9 text-xs text-white">
+            <i class="fa-solid fa-network-wired"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/70 text-sky-950 border border-white">
             Public IP
           </span>
         </div>
 
-        <div class="flex items-end justify-between mt-2">
+        <div class="flex items-end justify-between mt-2 z-10">
           <div class="min-w-0 pr-1">
-            <div id="clientIpDisplay" class="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight leading-none truncate font-mono">
+            <div id="clientIpDisplay" class="text-xs sm:text-sm font-black text-zinc-900 tracking-tight leading-none truncate font-mono">
               Fetching IP...
             </div>
-            <div id="ipCityDisplay" class="text-[10px] font-bold text-slate-500 mt-1 truncate">
+            <div id="ipCityDisplay" class="text-[10px] font-bold text-zinc-600 mt-1 truncate">
               Detecting Location...
             </div>
           </div>
 
           <div class="gauge-well-mini">
             <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 64 64">
-              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(186, 230, 253, 0.45)" stroke-width="5" />
+              <circle cx="32" cy="32" r="24" fill="none" stroke="rgba(255, 255, 255, 0.45)" stroke-width="5" />
               <circle
                 id="pingArc"
                 class="progress-arc"
@@ -468,7 +716,7 @@
                 cy="32"
                 r="24"
                 fill="none"
-                stroke="#0284c7"
+                stroke="#2563eb"
                 stroke-width="5"
                 stroke-linecap="round"
                 stroke-dasharray="150.79"
@@ -476,65 +724,65 @@
               />
             </svg>
             <div class="gauge-core-mini">
-              <span id="pingMsDisplay" class="text-[10px] font-extrabold text-sky-700">18ms</span>
+              <span id="pingMsDisplay" class="text-[10px] font-black text-sky-900">18ms</span>
             </div>
           </div>
         </div>
       </article>
 
-      <!-- CARD 3: DEVICE OS & PLATFORM (Dynamic per-device detection) -->
-      <article class="glass-slab p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
-        <div class="flex items-center justify-between">
-          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #f5f3ff 0%, #ddd6fe 70%, #c4b5fd 100%);">
-            <i id="deviceOsIcon" class="fa-solid fa-laptop text-indigo-700 text-sm"></i>
+      <!-- CARD 3: DEVICE OS & PLATFORM -->
+      <article class="liquid-glass-box rounded-[28px] p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
+        <div class="flex items-center justify-between z-10">
+          <div class="glass-orb orb-amber w-9 h-9 text-xs">
+            <i id="deviceOsIcon" class="fa-solid fa-laptop text-zinc-950"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200">
+          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/70 text-amber-950 border border-white">
             Device OS
           </span>
         </div>
 
-        <div class="flex items-end justify-between mt-2">
+        <div class="flex items-end justify-between mt-2 z-10">
           <div class="min-w-0 pr-1">
-            <div id="cardOsDisplay" class="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-none truncate">
+            <div id="cardOsDisplay" class="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-none truncate">
               Detecting...
             </div>
-            <div id="cardBrowserDisplay" class="text-[10px] font-bold text-slate-500 mt-1 truncate">
+            <div id="cardBrowserDisplay" class="text-[10px] font-bold text-zinc-600 mt-1 truncate">
               Device Info
             </div>
           </div>
 
           <div class="gauge-well-mini">
             <div class="gauge-core-mini">
-              <i id="devicePlatformIcon" class="fa-solid fa-shield-halved text-indigo-600 text-sm"></i>
+              <i class="fa-solid fa-shield-halved text-amber-800 text-sm"></i>
             </div>
           </div>
         </div>
       </article>
 
-      <!-- CARD 4: ANTI-SLEEP & CLOUD UPTIME -->
-      <article class="glass-slab p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
-        <div class="flex items-center justify-between">
-          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #fff7ed 0%, #fed7aa 70%, #fdba74 100%);">
-            <i class="fa-solid fa-clock text-orange-700 text-sm"></i>
+      <!-- CARD 4: 24/7 CLOUD UPTIME & ANTI-SLEEP -->
+      <article class="liquid-glass-box rounded-[28px] p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
+        <div class="flex items-center justify-between z-10">
+          <div class="glass-orb orb-rainbow w-9 h-9 text-xs">
+            <i class="fa-solid fa-clock text-zinc-950"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200">
+          <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/70 text-zinc-950 border border-white">
             24/7 Active
           </span>
         </div>
 
-        <div class="flex items-end justify-between mt-2">
+        <div class="flex items-end justify-between mt-2 z-10">
           <div>
-            <div class="text-xl font-extrabold text-slate-900 tracking-tight leading-none font-mono">
+            <div class="text-xl font-black text-zinc-900 tracking-tight leading-none font-mono">
               99.9%
             </div>
-            <div class="text-[10px] font-semibold text-slate-500 mt-1">
+            <div class="text-[10px] font-bold text-zinc-600 mt-1">
               Anti-Sleep ON
             </div>
           </div>
 
           <div class="gauge-well-mini">
             <div class="gauge-core-mini">
-              <i class="fa-solid fa-cloud text-orange-600 text-sm"></i>
+              <i class="fa-solid fa-cloud text-indigo-700 text-sm"></i>
             </div>
           </div>
         </div>
@@ -543,286 +791,288 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- 4. LIVE BROWSER & CLIENT API METRICS (Requested by User)          -->
+    <!-- 4. LIVE BROWSER & CLIENT API METRICS                              -->
     <!-- ================================================================= -->
-    <section class="glass-slab p-3.5 sm:p-4">
-      <div class="flex items-center justify-between gap-2 mb-3">
+    <section class="liquid-glass-box rounded-[32px] p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-2 mb-3.5 z-10">
         <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 text-xs shadow-sm">
-            <i class="fa-solid fa-code"></i>
+          <div class="glass-orb orb-clear w-8 h-8 text-xs">
+            <i class="fa-solid fa-code text-zinc-900"></i>
           </div>
           <div>
-            <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Live Browser & Device APIs</h3>
-            <p class="text-[10px] text-slate-500 font-medium">Real-time client hardware & navigator specs</p>
+            <h3 class="text-xs sm:text-sm font-black text-zinc-900 tracking-tight">Live Hardware &amp; Browser APIs</h3>
+            <p class="text-[10px] text-zinc-600 font-bold">Real-time client hardware &amp; navigator specs</p>
           </div>
         </div>
-        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white/80 text-emerald-950 border border-white flex items-center gap-1 shadow-xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
           Live API
         </span>
       </div>
 
       <!-- 2-Column Grid on Mobile, 4-Column on Desktop -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 z-10">
         <!-- Item 1: Public IP Address -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-network-wired"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-blue w-7 h-7 text-xs text-white shrink-0">
+            <i class="fa-solid fa-network-wired text-[10px]"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Public IP</div>
-            <div id="bApiIp" class="text-xs font-extrabold text-slate-800 truncate font-mono">Fetching IP...</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Public IP</div>
+            <div id="bApiIp" class="text-xs font-black text-zinc-900 truncate font-mono">Fetching IP...</div>
           </div>
         </div>
 
         <!-- Item 2: System / Host OS -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-xs flex-shrink-0">
-            <i id="bApiOsIcon" class="fa-brands fa-windows"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-amber w-7 h-7 text-xs shrink-0">
+            <i id="bApiOsIcon" class="fa-brands fa-windows text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System OS</div>
-            <div id="bApiOs" class="text-xs font-extrabold text-slate-800 truncate">Windows 11</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">System OS</div>
+            <div id="bApiOs" class="text-xs font-black text-zinc-900 truncate">Windows 11</div>
           </div>
         </div>
 
         <!-- Item 3: Browser Engine -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-compass"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-green w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-compass text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Browser</div>
-            <div id="bApiBrowser" class="text-xs font-extrabold text-slate-800 truncate">Detecting...</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Browser</div>
+            <div id="bApiBrowser" class="text-xs font-black text-zinc-900 truncate">Detecting...</div>
           </div>
         </div>
 
         <!-- Item 4: Screen Resolution -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-display"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-clear w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-display text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Screen</div>
-            <div id="bApiScreen" class="text-xs font-extrabold text-slate-800 truncate">-- × --</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Screen</div>
+            <div id="bApiScreen" class="text-xs font-black text-zinc-900 truncate">-- × --</div>
           </div>
         </div>
 
         <!-- Item 5: Battery API -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-battery-half"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-green w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-battery-half text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Battery API</div>
-            <div id="bApiBattery" class="text-xs font-extrabold text-slate-800 truncate">--%</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Battery API</div>
+            <div id="bApiBattery" class="text-xs font-black text-zinc-900 truncate">--%</div>
           </div>
         </div>
 
         <!-- Item 6: CPU Cores -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-microchip"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-red w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-microchip text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">CPU Cores</div>
-            <div id="bApiCores" class="text-xs font-extrabold text-slate-800 truncate">-- Cores</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">CPU Cores</div>
+            <div id="bApiCores" class="text-xs font-black text-zinc-900 truncate">-- Cores</div>
           </div>
         </div>
 
         <!-- Item 7: Device RAM -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-memory"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-champagne w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-memory text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Memory RAM</div>
-            <div id="bApiMemory" class="text-xs font-extrabold text-slate-800 truncate">--</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Memory RAM</div>
+            <div id="bApiMemory" class="text-xs font-black text-zinc-900 truncate">--</div>
           </div>
         </div>
 
         <!-- Item 8: Location & ISP -->
-        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 text-xs flex-shrink-0">
-            <i class="fa-solid fa-location-dot"></i>
+        <div class="p-2.5 rounded-2xl bg-white/60 border border-white shadow-xs flex items-center gap-2.5">
+          <div class="glass-orb orb-rainbow w-7 h-7 text-xs shrink-0">
+            <i class="fa-solid fa-location-dot text-[11px] text-zinc-950"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Location / ISP</div>
-            <div id="bApiLocation" class="text-xs font-extrabold text-slate-800 truncate">Detecting...</div>
+            <div class="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider">Location / ISP</div>
+            <div id="bApiLocation" class="text-xs font-black text-zinc-900 truncate">Detecting...</div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- ================================================================= -->
-    <!-- 5. BOT COMMANDS SHOWCASE (Clean 2-Col Mobile Grid)                -->
+    <!-- 5. BOT COMMANDS SHOWCASE                                          -->
     <!-- ================================================================= -->
-    <section class="glass-slab p-4 sm:p-5">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-3.5">
+    <section class="liquid-glass-box rounded-[32px] p-4 sm:p-5">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-3.5 z-10">
         <div>
           <div class="flex items-center gap-1.5 mb-0.5">
-            <i class="fa-solid fa-terminal text-emerald-600 text-xs"></i>
-            <h3 class="text-sm sm:text-base font-extrabold text-slate-900">Popular Commands</h3>
+            <div class="glass-orb orb-green w-6 h-6 text-[10px] shrink-0">
+              <i class="fa-solid fa-terminal text-zinc-950"></i>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-zinc-900">Popular Bot Commands</h3>
           </div>
-          <p class="text-[11px] text-slate-500">Kisi bhi command par click karein foran copy ho jayegi:</p>
+          <p class="text-[11px] font-bold text-zinc-600">Kisi bhi command par click karein foran copy ho jayegi:</p>
         </div>
 
-        <!-- Filter Chips -->
+        <!-- Filter Chips in Glass Capsule -->
         <div class="flex items-center gap-1 flex-wrap">
-          <button onclick="filterCommands('all')" class="cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500 text-white shadow-sm cursor-pointer">All</button>
-          <button onclick="filterCommands('music')" class="cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-white/80 hover:bg-white transition cursor-pointer">Media</button>
-          <button onclick="filterCommands('ai')" class="cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-white/80 hover:bg-white transition cursor-pointer">AI</button>
-          <button onclick="filterCommands('group')" class="cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-white/80 hover:bg-white transition cursor-pointer">Group</button>
-          <button onclick="filterCommands('fun')" class="cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-white/80 hover:bg-white transition cursor-pointer">Greetings</button>
+          <button onclick="filterCommands('all'); playBubblePop(500);" class="cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-black bg-zinc-900 text-white shadow-sm cursor-pointer">All</button>
+          <button onclick="filterCommands('music'); playBubblePop(520);" class="cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-extrabold text-zinc-700 bg-white/70 hover:bg-white transition cursor-pointer">Media</button>
+          <button onclick="filterCommands('ai'); playBubblePop(540);" class="cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-extrabold text-zinc-700 bg-white/70 hover:bg-white transition cursor-pointer">AI</button>
+          <button onclick="filterCommands('group'); playBubblePop(560);" class="cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-extrabold text-zinc-700 bg-white/70 hover:bg-white transition cursor-pointer">Group</button>
+          <button onclick="filterCommands('fun'); playBubblePop(580);" class="cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-extrabold text-zinc-700 bg-white/70 hover:bg-white transition cursor-pointer">Greetings</button>
         </div>
       </div>
 
       <!-- Commands Grid: Strictly 2-Col on Mobile, 4-Col on Desktop -->
-      <div id="commandsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      <div id="commandsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 z-10">
         <!-- Media -->
-        <div data-cat="music" onclick="copyCommand('.play Believer')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-emerald-700">.play &lt;song&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-emerald-500 text-[10px]"></i>
+        <div data-cat="music" onclick="copyCommand('.play Believer')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.play &lt;song&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">MP3 Song Download</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">MP3 Song Download</p>
         </div>
 
-        <div data-cat="music" onclick="copyCommand('.ytmp4 funny video')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-emerald-700">.ytmp4 &lt;video&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-emerald-500 text-[10px]"></i>
+        <div data-cat="music" onclick="copyCommand('.ytmp4 funny video')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.ytmp4 &lt;video&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">HD Video Download</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">HD Video Download</p>
         </div>
 
-        <div data-cat="music" onclick="copyCommand('.tt https://vt.tiktok.com/...')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-emerald-700">.tt &lt;url&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-emerald-500 text-[10px]"></i>
+        <div data-cat="music" onclick="copyCommand('.tt https://vt.tiktok.com/...')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.tt &lt;url&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">TikTok No Watermark</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">TikTok No Watermark</p>
         </div>
 
         <!-- AI -->
-        <div data-cat="ai" onclick="copyCommand('.ai What is artificial intelligence?')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-sky-700">.ai &lt;query&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-sky-500 text-[10px]"></i>
+        <div data-cat="ai" onclick="copyCommand('.ai What is artificial intelligence?')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-sky-800">.ai &lt;query&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-sky-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Free Smart AI Chat</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Free Smart AI Chat</p>
         </div>
 
         <!-- Greetings -->
-        <div data-cat="fun" onclick="copyCommand('.morning')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-orange-700">.morning / .gm</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-orange-500 text-[10px]"></i>
+        <div data-cat="fun" onclick="copyCommand('.morning')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-amber-800">.morning / .gm</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-amber-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Morning Wishes</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Morning Wishes</p>
         </div>
 
-        <div data-cat="fun" onclick="copyCommand('.goodnight')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-indigo-700">.goodnight / .gn</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-indigo-500 text-[10px]"></i>
+        <div data-cat="fun" onclick="copyCommand('.goodnight')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-indigo-800">.goodnight / .gn</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-indigo-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Bedtime Card</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Bedtime Card</p>
         </div>
 
-        <div data-cat="fun" onclick="copyCommand('.thanks')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-purple-700">.thanks / .wlcm</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-purple-500 text-[10px]"></i>
+        <div data-cat="fun" onclick="copyCommand('.thanks')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-rose-800">.thanks / .wlcm</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-rose-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Gratitude Reply</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Gratitude Reply</p>
         </div>
 
         <!-- Group Admin -->
-        <div data-cat="group" onclick="copyCommand('.tagall')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-teal-700">.tagall</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-teal-500 text-[10px]"></i>
+        <div data-cat="group" onclick="copyCommand('.tagall')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.tagall</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Mention All Members</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Mention All Members</p>
         </div>
 
-        <div data-cat="group" onclick="copyCommand('.hidetag Urgent Announcement')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-teal-700">.hidetag &lt;msg&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-teal-500 text-[10px]"></i>
+        <div data-cat="group" onclick="copyCommand('.hidetag Urgent Announcement')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.hidetag &lt;msg&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Hidden Broadcast Tag</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Hidden Broadcast Tag</p>
         </div>
 
-        <div data-cat="group" onclick="copyCommand('.antilink on')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-rose-700">.antilink on</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-rose-500 text-[10px]"></i>
+        <div data-cat="group" onclick="copyCommand('.antilink on')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-rose-800">.antilink on</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-rose-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Auto Delete Links</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Auto Delete Links</p>
         </div>
 
         <!-- Utility -->
-        <div data-cat="ai" onclick="copyCommand('.weather Lahore')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-emerald-700">.weather &lt;city&gt;</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-emerald-500 text-[10px]"></i>
+        <div data-cat="ai" onclick="copyCommand('.weather Lahore')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-teal-800">.weather &lt;city&gt;</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-teal-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">Weather Forecast</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">Weather Forecast</p>
         </div>
 
-        <div data-cat="all" onclick="copyCommand('.menu')" class="cmd-card p-2.5 rounded-xl bg-white/70 hover:bg-white border border-slate-200/80 transition cursor-pointer shadow-sm group">
-          <div class="flex items-center justify-between text-[11px] font-bold text-slate-800">
-            <span class="font-mono text-emerald-700">.menu</span>
-            <i class="fa-regular fa-copy text-slate-400 group-hover:text-emerald-500 text-[10px]"></i>
+        <div data-cat="all" onclick="copyCommand('.menu')" class="cmd-card p-2.5 rounded-2xl bg-white/60 hover:bg-white border border-white transition cursor-pointer shadow-xs group">
+          <div class="flex items-center justify-between text-[11px] font-black text-zinc-900">
+            <span class="font-mono text-emerald-800">.menu</span>
+            <i class="fa-regular fa-copy text-zinc-400 group-hover:text-emerald-600 text-[10px]"></i>
           </div>
-          <p class="text-[10px] text-slate-500 mt-0.5">All 700+ Commands</p>
+          <p class="text-[10px] font-bold text-zinc-500 mt-0.5">All 700+ Commands</p>
         </div>
       </div>
     </section>
 
     <!-- ================================================================= -->
-    <!-- 5. DEVELOPER & CONTACT HUB (Live Synced via REST API)             -->
+    <!-- 6. DEVELOPER & CONTACT HUB (Live Synced via REST API)             -->
     <!-- ================================================================= -->
-    <section class="glass-slab p-3.5 sm:p-4">
-      <div class="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-200/60">
+    <section class="liquid-glass-box rounded-[32px] p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-zinc-900/10 z-10">
         <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600 text-xs shadow-sm">
-            <i class="fa-solid fa-address-card"></i>
+          <div class="glass-orb orb-amber w-8 h-8 text-xs shrink-0">
+            <i class="fa-solid fa-address-card text-zinc-950"></i>
           </div>
           <div>
-            <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Official Developer & Contact Hub</h3>
-            <p class="text-[10px] text-slate-500 font-medium">Real-time profile & verified contact links</p>
+            <h3 class="text-xs sm:text-sm font-black text-zinc-900 tracking-tight">Official Developer &amp; Contact Hub</h3>
+            <p class="text-[10px] text-zinc-600 font-bold">Real-time profile &amp; verified contact links</p>
           </div>
         </div>
-        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white/80 text-emerald-950 border border-white flex items-center gap-1 shadow-xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
           <span>API Synced</span>
         </span>
       </div>
 
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 z-10">
         <!-- Developer Profile Mini-Card -->
         <div class="flex items-center gap-3 w-full sm:w-auto">
           <div class="relative flex-shrink-0">
-            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-full p-[2px] bg-gradient-to-tr from-orange-400 via-pink-500 to-indigo-500 shadow-md">
+            <div class="w-12 h-12 rounded-full p-[2px] bg-gradient-to-tr from-orange-400 via-pink-500 to-indigo-500 shadow-md">
               <img
                 id="hubAvatar"
                 src="https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp"
                 alt="SALU"
-                class="w-full h-full object-cover rounded-full border border-white"
+                class="w-full h-full object-cover rounded-full border-2 border-white"
               />
             </div>
             <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">
-              <h4 id="hubName" class="text-xs sm:text-sm font-extrabold text-slate-900 truncate">SALU</h4>
-              <i class="fa-solid fa-circle-check text-sky-500 text-xs" title="Verified Creator"></i>
+              <h4 id="hubName" class="text-xs sm:text-sm font-black text-zinc-900 truncate">SALU</h4>
+              <i class="fa-solid fa-circle-check text-sky-600 text-xs" title="Verified Creator"></i>
             </div>
-            <p id="hubTagline" class="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate">Full-Stack Engineer & Cyber Security Specialist</p>
-            <div class="flex items-center gap-2 mt-0.5 text-[9px] sm:text-[10px] text-slate-400 font-medium">
+            <p id="hubTagline" class="text-[10px] sm:text-[11px] font-bold text-zinc-600 truncate">Full-Stack Engineer &amp; Cyber Security Specialist</p>
+            <div class="flex items-center gap-2 mt-0.5 text-[9px] sm:text-[10px] text-zinc-500 font-bold">
               <span class="flex items-center gap-1"><i class="fa-solid fa-location-dot text-rose-500"></i> <span id="hubLocation">Gojra, Faisalabad, Pakistan</span></span>
             </div>
           </div>
@@ -833,25 +1083,31 @@
           <!-- WhatsApp Direct -->
           <a
             id="hubWaBtn"
-            href="https://wa.me/923464616487"
+            href="https://wa.me/923468616487"
             target="_blank"
             rel="noopener noreferrer"
-            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+            onclick="playBubblePop(660)"
+            class="liquid-glass-box rounded-2xl p-2.5 text-center shadow-xs active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
           >
-            <i class="fa-brands fa-whatsapp text-emerald-600 text-sm group-hover:scale-110 transition-transform"></i>
-            <span class="text-[9px] sm:text-[10px] font-extrabold text-emerald-800 mt-0.5">WhatsApp</span>
+            <div class="glass-orb orb-green w-8 h-8 text-xs text-white mb-1">
+              <i class="fa-brands fa-whatsapp"></i>
+            </div>
+            <span class="text-[9px] sm:text-[10px] font-black text-zinc-900">WhatsApp</span>
           </a>
 
           <!-- Official Portfolio -->
           <a
             id="hubPortfolioBtn"
-            href="https://mrsaqib242.vercel.app"
+            href="https://mrsaqib.me"
             target="_blank"
             rel="noopener noreferrer"
-            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+            onclick="playBubblePop(680)"
+            class="liquid-glass-box rounded-2xl p-2.5 text-center shadow-xs active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
           >
-            <i class="fa-solid fa-globe text-sky-600 text-sm group-hover:scale-110 transition-transform"></i>
-            <span class="text-[9px] sm:text-[10px] font-extrabold text-sky-800 mt-0.5">Portfolio</span>
+            <div class="glass-orb orb-blue w-8 h-8 text-xs text-white mb-1">
+              <i class="fa-solid fa-globe"></i>
+            </div>
+            <span class="text-[9px] sm:text-[10px] font-black text-zinc-900">Portfolio</span>
           </a>
 
           <!-- Instagram -->
@@ -860,64 +1116,107 @@
             href="https://www.instagram.com/mr_saqib242"
             target="_blank"
             rel="noopener noreferrer"
-            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+            onclick="playBubblePop(700)"
+            class="liquid-glass-box rounded-2xl p-2.5 text-center shadow-xs active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
           >
-            <i class="fa-brands fa-instagram text-rose-600 text-sm group-hover:scale-110 transition-transform"></i>
-            <span class="text-[9px] sm:text-[10px] font-extrabold text-rose-800 mt-0.5">Instagram</span>
+            <div class="glass-orb orb-red w-8 h-8 text-xs text-zinc-950 mb-1">
+              <i class="fa-brands fa-instagram"></i>
+            </div>
+            <span class="text-[9px] sm:text-[10px] font-black text-zinc-900">Instagram</span>
           </a>
         </div>
       </div>
     </section>
 
     <!-- ================================================================= -->
-    <!-- 6. COMPACT LIVE TERMINAL LOGS                                     -->
+    <!-- 7. COMPACT LIVE TERMINAL LOGS                                     -->
     <!-- ================================================================= -->
-    <section class="glass-slab p-3.5 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
+    <section class="liquid-glass-box rounded-[32px] p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-2 z-10">
         <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span class="text-xs font-bold text-slate-800">Live Bot Activity Feed</span>
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-xs font-black text-zinc-900">Live Bot Activity Feed</span>
         </div>
         <button
-          onclick="document.getElementById('terminalOutput').innerHTML=''"
-          class="glass-pill px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer"
+          onclick="document.getElementById('terminalOutput').innerHTML=''; playBubblePop(480);"
+          class="liquid-glass-box rounded-full px-3 py-1 text-[10px] font-black text-zinc-700 hover:text-zinc-950 transition cursor-pointer"
         >
           Clear
         </button>
       </div>
 
-      <div id="terminalOutput" class="terminal-console rounded-xl p-3 h-28 overflow-y-auto text-[11px] text-slate-200 space-y-1">
-        <div class="text-emerald-400">[System] ⚡ SALU MD Dashboard Initialized.</div>
-        <div class="text-sky-300">[Ready] Enter your phone number above to get pairing code.</div>
+      <div id="terminalOutput" class="terminal-console rounded-2xl p-3.5 h-28 overflow-y-auto text-[11px] text-zinc-200 space-y-1 z-10">
+        <div class="text-emerald-400 font-semibold">[System] ⚡ SALU MD 3D Liquid Glass Dashboard Initialized.</div>
+        <div class="text-sky-300 font-semibold">[Ready] Enter your phone number above to get pairing code.</div>
       </div>
     </section>
 
     <!-- ================================================================= -->
-    <!-- 7. CLEAN FOOTER WITH OWNER LINK                                   -->
+    <!-- 8. CLEAN 3D LIQUID GLASS FOOTER                                   -->
     <!-- ================================================================= -->
-    <footer class="pt-1 pb-4 flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
-      <div class="glass-pill rounded-full px-4 py-2 flex flex-wrap items-center justify-center gap-3 shadow-sm text-center">
-        <span class="font-bold text-slate-800 flex items-center gap-1.5">
-          <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+    <footer class="pt-1 pb-6 flex flex-col items-center justify-center gap-2 text-xs text-zinc-600">
+      <div class="liquid-glass-box rounded-full px-5 py-2 flex flex-wrap items-center justify-center gap-3 shadow-sm text-center">
+        <span class="font-black text-zinc-900 flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-halved text-teal-700"></i>
           <strong>SALU MD</strong>
         </span>
-        <span class="text-slate-300 hidden sm:inline">|</span>
-        <a id="footerPortfolioLink" href="https://mrsaqib242.vercel.app" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:text-slate-900 transition flex items-center gap-1">
-          <i class="fa-solid fa-globe text-sky-600"></i>
-          <span id="footerPortfolioText">mrsaqib242.vercel.app</span>
+        <span class="text-zinc-400 hidden sm:inline">|</span>
+        <a id="footerPortfolioLink" href="https://mrsaqib.me" target="_blank" rel="noopener noreferrer" class="font-extrabold text-zinc-800 hover:text-zinc-950 transition flex items-center gap-1">
+          <i class="fa-solid fa-globe text-sky-700"></i>
+          <span id="footerPortfolioText">mrsaqib.me</span>
         </a>
       </div>
-      <p class="text-[10px] text-slate-400">
-        © 2026 SALU MD · Designed by <span id="footerName" class="font-semibold text-slate-600">SALU</span> · All Rights Reserved
+      <p class="text-[10px] font-bold text-zinc-500">
+        © 2026 SALU MD · Designed by <span id="footerName" class="font-extrabold text-zinc-700">SALU</span> · All Rights Reserved
       </p>
     </footer>
 
   </main>
 
   <!-- =================================================================== -->
-  <!-- JAVASCRIPT: PAIRING ENGINE & TELEMETRY API                          -->
+  <!-- JAVASCRIPT: PAIRING ENGINE, AUDIO SYNTH & TELEMETRY API             -->
   <!-- =================================================================== -->
   <script>
+    // 1. Audio Synth (Bubble Pop Synthesis via Web Audio API)
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function playBubblePop(freq = 580) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.45, audioCtx.currentTime + 0.055);
+
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.065);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.07);
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      if (icon) {
+        icon.className = soundEnabled ? 'fa-solid fa-volume-high text-zinc-900' : 'fa-solid fa-volume-xmark text-zinc-400';
+      }
+      if (soundEnabled) playBubblePop(600);
+    }
+
+    // 2. Backend & Socket.IO Base
     const isExternalHost = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('pages.dev') || window.location.protocol === 'file:';
     const API_BASE = isExternalHost ? 'https://web-production-f30a34e9.up.railway.app' : '';
 
@@ -948,17 +1247,17 @@
       if (tab === 'code') {
         codeTab.classList.remove('hidden');
         qrTab.classList.add('hidden');
-        codeBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95';
-        qrBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95';
+        codeBtn.className = 'glass-orb orb-green px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-white flex items-center gap-2 shadow-md';
+        qrBtn.className = 'px-5 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-zinc-700 hover:text-zinc-950 hover:bg-white/60 cursor-pointer active:scale-95';
       } else {
         codeTab.classList.add('hidden');
         qrTab.classList.remove('hidden');
-        qrBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer active:scale-95';
-        codeBtn.className = 'px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-slate-600 hover:text-slate-900 hover:bg-white/80 cursor-pointer active:scale-95';
+        qrBtn.className = 'glass-orb orb-green px-5 py-2.5 rounded-full text-xs sm:text-sm font-black text-white flex items-center gap-2 shadow-md';
+        codeBtn.className = 'px-5 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition flex items-center gap-2 text-zinc-700 hover:text-zinc-950 hover:bg-white/60 cursor-pointer active:scale-95';
       }
     }
 
-    // Pairing Logic
+    // 3. Pairing Logic
     const pairBtn = document.getElementById('pairBtn');
     const phoneInput = document.getElementById('phoneInput');
     const codeResultArea = document.getElementById('codeResultArea');
@@ -984,8 +1283,8 @@
         codeResultArea.classList.remove('hidden');
         codeDisplay.textContent = 'WAITING...';
 
-        connStatusBox.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-200', 'bg-rose-50', 'text-rose-800', 'border-rose-200');
-        connStatusBox.classList.add('bg-sky-50', 'text-sky-800', 'border-sky-200');
+        connStatusBox.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-900', 'border-emerald-300', 'bg-rose-50', 'text-rose-900', 'border-rose-300');
+        connStatusBox.classList.add('bg-white/80', 'text-sky-950', 'border-sky-300');
         connStatusIcon.className = 'fa-solid fa-spinner fa-spin text-sky-600';
         connStatusMsg.textContent = `Generating code for +${number}...`;
         addLog(`Requesting pairing code for +${number}...`);
@@ -1000,6 +1299,7 @@
             pairBtn.disabled = false;
             addLog(`🔑 Pairing Code: ${data.code}`, 'success');
             connStatusMsg.textContent = 'Code generated! WhatsApp Linked Devices mein enter karein.';
+            playBubblePop(740);
 
             if (window.pairPoll) clearInterval(window.pairPoll);
             window.pairPoll = setInterval(async () => {
@@ -1028,9 +1328,9 @@
           }
         } catch (err) {
           addLog(`❌ Error: ${err.message}`, 'error');
-          connStatusBox.classList.remove('bg-sky-50', 'text-sky-800', 'border-sky-200');
-          connStatusBox.classList.add('bg-rose-50', 'text-rose-800', 'border-rose-200');
-          connStatusIcon.className = 'fa-solid fa-triangle-exclamation text-rose-500';
+          connStatusBox.classList.remove('bg-white/80', 'text-sky-950', 'border-sky-300');
+          connStatusBox.classList.add('bg-rose-50', 'text-rose-900', 'border-rose-300');
+          connStatusIcon.className = 'fa-solid fa-triangle-exclamation text-rose-600';
           connStatusMsg.textContent = `Error: ${err.message}`;
           pairBtn.disabled = false;
           document.getElementById('pairBtnText').textContent = 'Try Again';
@@ -1039,13 +1339,14 @@
     }
 
     function onConnectedSuccess(num) {
-      connStatusBox.classList.remove('bg-sky-50', 'text-sky-800', 'border-sky-200');
-      connStatusBox.classList.add('bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
+      connStatusBox.classList.remove('bg-white/80', 'text-sky-950', 'border-sky-300');
+      connStatusBox.classList.add('bg-emerald-50', 'text-emerald-950', 'border-emerald-300');
       connStatusIcon.className = 'fa-solid fa-circle-check text-emerald-600';
       connStatusMsg.textContent = `🎉 Connected! SALU MD is online for +${num}!`;
       document.getElementById('pairBtnText').textContent = '✅ Connected';
       pairBtn.disabled = true;
       addLog(`✅ WhatsApp Connected successfully for +${num}!`, 'success');
+      playBubblePop(880);
     }
 
     const codeResultBox = document.querySelector('.pairing-box');
@@ -1056,13 +1357,14 @@
           navigator.clipboard.writeText(text).then(() => {
             const feed = document.getElementById('copyFeedback');
             feed.textContent = 'COPIED TO CLIPBOARD! ✅';
-            setTimeout(() => { feed.textContent = 'Tap anywhere to copy'; }, 2000);
+            playBubblePop(700);
+            setTimeout(() => { feed.textContent = 'Tap anywhere to copy code'; }, 2000);
           }).catch(() => {});
         }
       });
     }
 
-    // QR Logic
+    // 4. QR Logic
     const qrGenBtn = document.getElementById('qrGenBtn');
     const qrDisplayContainer = document.getElementById('qrDisplayContainer');
     const qrImageElement = document.getElementById('qrImageElement');
@@ -1082,6 +1384,7 @@
             document.getElementById('qrGenBtnText').textContent = 'Refresh';
             qrGenBtn.disabled = false;
             addLog('📷 QR Code loaded! Scan with WhatsApp.', 'success');
+            playBubblePop(660);
 
             const sid = data.sessionId;
             let count = 0;
@@ -1092,8 +1395,9 @@
                 const s = await (await fetch(API_BASE + '/api/qr/status?id=' + sid)).json();
                 if (s.connected) {
                   clearInterval(qPoll);
-                  qrDisplayContainer.innerHTML = '<div class="text-emerald-700 font-extrabold text-sm p-3">🎉 WhatsApp Connected via QR!</div>';
+                  qrDisplayContainer.innerHTML = '<div class="text-emerald-900 font-extrabold text-sm p-3">🎉 WhatsApp Connected via QR!</div>';
                   addLog('✅ Connected via QR code!', 'success');
+                  playBubblePop(880);
                 }
               } catch (e) {}
             }, 2000);
@@ -1106,7 +1410,7 @@
       });
     }
 
-    // Battery Telemetry
+    // 5. Battery Telemetry
     if ('getBattery' in navigator) {
       navigator.getBattery().then((battery) => {
         function updateBattery() {
@@ -1121,10 +1425,10 @@
           arc.style.strokeDashoffset = (circ * (1 - level / 100)).toFixed(1);
 
           const icon = document.getElementById('batteryIcon');
-          if (charging) icon.className = 'fa-solid fa-bolt text-emerald-700 text-sm';
-          else if (level > 70) icon.className = 'fa-solid fa-battery-full text-emerald-700 text-sm';
-          else if (level > 30) icon.className = 'fa-solid fa-battery-three-quarters text-emerald-700 text-sm';
-          else icon.className = 'fa-solid fa-battery-quarter text-orange-600 text-sm';
+          if (charging) icon.className = 'fa-solid fa-bolt text-zinc-950 text-sm';
+          else if (level > 70) icon.className = 'fa-solid fa-battery-full text-zinc-950 text-sm';
+          else if (level > 30) icon.className = 'fa-solid fa-battery-three-quarters text-zinc-950 text-sm';
+          else icon.className = 'fa-solid fa-battery-quarter text-rose-700 text-sm';
           const bApiBattery = document.getElementById('bApiBattery');
           if (bApiBattery) bApiBattery.textContent = `${level}% ${charging ? '⚡' : ''}`;
         }
@@ -1140,22 +1444,16 @@
       if (bApiBattery) bApiBattery.textContent = '100% ⚡ AC';
     }
 
-    // ═════════════════════════════════════════════════════════
-    // LIVE CREATOR & CONTACT PROFILE API (mrsaqib242 Vercel Sync)
-    // ═════════════════════════════════════════════════════════
+    // 6. Creator & Contact Profile Sync
     async function fetchContactProfile() {
       let profile = null;
 
-      // 1. Try local bot proxy /api/contact
       try {
         const res = await fetch((API_BASE || '') + '/api/contact', { cache: 'no-store' });
         const json = await res.json();
-        if (json && json.success && json.data) {
-          profile = json.data;
-        }
+        if (json && json.success && json.data) profile = json.data;
       } catch (e) {}
 
-      // 2. Fallback to direct Vercel API if on same domain or allowed
       if (!profile) {
         try {
           const res = await fetch('https://mrsaqib242.vercel.app/api/public/contact', {
@@ -1163,13 +1461,10 @@
             cache: 'no-store'
           });
           const json = await res.json();
-          if (json && json.success && json.data) {
-            profile = json.data;
-          }
+          if (json && json.success && json.data) profile = json.data;
         } catch (e) {}
       }
 
-      // 3. Fallback default data
       if (!profile) {
         profile = {
           name: "SALU",
@@ -1178,7 +1473,7 @@
           bio: "Available for elite web applications, Next.js SaaS engineering, and AI chatbot integrations.",
           email: "mrsaqib242242@gmail.com",
           phone: "+92 3468616487",
-          whatsapp: "https://wa.me/923464616487",
+          whatsapp: "https://wa.me/923468616487",
           location: "Gojra, Faisalabad, Pakistan",
           avatar: "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp",
           instagram: "https://www.instagram.com/mr_saqib242",
@@ -1189,20 +1484,16 @@
           badge_text: "Verified ID"
         };
       } else {
-        // Enforce SALU branding
         profile.name = "SALU";
         profile.short_name = "SALU";
         profile.avatar = "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp";
       }
 
-      // Populate Header Elements
       const headerAvatar = document.getElementById('headerAvatar');
       if (headerAvatar && profile.avatar) headerAvatar.src = profile.avatar;
 
       const headerCreatorLink = document.getElementById('headerCreatorLink');
-      if (headerCreatorLink) {
-        if (profile.name) headerCreatorLink.textContent = profile.name;
-      }
+      if (headerCreatorLink && profile.name) headerCreatorLink.textContent = profile.name;
 
       const headerTagline = document.getElementById('headerTagline');
       if (headerTagline && profile.tagline) headerTagline.textContent = profile.tagline;
@@ -1210,24 +1501,9 @@
       const headerBadge = document.getElementById('headerBadge');
       if (headerBadge && profile.badge_text) headerBadge.textContent = profile.badge_text;
 
-      const headerPortfolioBtn = document.getElementById('headerPortfolioBtn');
-      if (headerPortfolioBtn) {
-        headerPortfolioBtn.href = 'https://mrsaqib.me';
-        const hostEl = document.getElementById('headerPortfolioText');
-        if (hostEl) hostEl.textContent = 'mrsaqib.me';
-      }
-
       const headerWhatsAppBtn = document.getElementById('headerWhatsAppBtn');
-      if (headerWhatsAppBtn && profile.whatsapp) {
-        headerWhatsAppBtn.href = profile.whatsapp;
-      }
+      if (headerWhatsAppBtn && profile.whatsapp) headerWhatsAppBtn.href = profile.whatsapp;
 
-      const headerInstagramBtn = document.getElementById('headerInstagramBtn');
-      if (headerInstagramBtn && profile.instagram) {
-        headerInstagramBtn.href = profile.instagram;
-      }
-
-      // Populate Developer & Contact Hub Elements
       const hubAvatar = document.getElementById('hubAvatar');
       if (hubAvatar && profile.avatar) hubAvatar.src = profile.avatar;
 
@@ -1249,7 +1525,6 @@
       const hubIgBtn = document.getElementById('hubIgBtn');
       if (hubIgBtn && profile.instagram) hubIgBtn.href = profile.instagram;
 
-      // Populate Footer
       const footerName = document.getElementById('footerName');
       if (footerName && profile.name) footerName.textContent = profile.name;
 
@@ -1262,9 +1537,7 @@
     }
     fetchContactProfile();
 
-    // ═════════════════════════════════════════════════════════
-    // LIVE PUBLIC IP & CLIENT TELEMETRY (ipwho.is + ipify fallback)
-    // ═════════════════════════════════════════════════════════
+    // 7. Live Public IP & Telemetry
     async function fetchPublicIp() {
       const ipEl1 = document.getElementById('clientIpDisplay');
       const ipEl2 = document.getElementById('bApiIp');
@@ -1282,16 +1555,12 @@
         return true;
       }
 
-      // Try ipify first (instant, high availability, no CORS issues)
       try {
         const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
         const data = await res.json();
-        if (data && data.ip) {
-          updateIpUI(data.ip, 'Pakistan · Online');
-        }
+        if (data && data.ip) updateIpUI(data.ip, 'Pakistan · Online');
       } catch (e) {}
 
-      // Try ipwho.is for accurate city and country
       try {
         const res = await fetch('https://ipwho.is/', { cache: 'no-store' });
         const data = await res.json();
@@ -1302,30 +1571,26 @@
         }
       } catch (e) {}
 
-      // Try local/host backend /api/ip
       try {
         const res = await fetch((API_BASE || '') + '/api/ip', { cache: 'no-store' });
         const data = await res.json();
-        if (data && data.ip && updateIpUI(data.ip, 'Online')) {
-          return;
-        }
+        if (data && data.ip && updateIpUI(data.ip, 'Online')) return;
       } catch (e) {}
 
-      // Fallback: If still on "Fetching IP...", provide clean default
       if (ipEl1 && (ipEl1.textContent.includes('Fetching') || ipEl1.textContent === '127.0.0.1')) {
         updateIpUI('223.123.100.41', 'Pakistan · Online');
       }
     }
     fetchPublicIp();
 
-    // Browser & System Telemetry API (Dynamic per-device detection)
+    // 8. Browser & System Telemetry Detection
     (function detectClient() {
       const ua = navigator.userAgent || '';
       const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
 
       let osName = 'Windows';
       let osSub = 'Desktop PC';
-      let osIcon = 'fa-brands fa-windows text-sky-600';
+      let osIcon = 'fa-brands fa-windows text-sky-700';
 
       const isWin = platform.includes('win') || ua.includes('Windows') || ua.includes('Win32') || ua.includes('Win64');
       const isAndroid = ua.includes('Android');
@@ -1339,26 +1604,25 @@
         else if (ua.includes('Windows NT 6.1')) osName = 'Windows 7';
         else osName = 'Windows PC';
         osSub = 'Desktop PC';
-        osIcon = 'fa-brands fa-windows text-sky-600';
+        osIcon = 'fa-brands fa-windows text-sky-700';
       } else if (isAndroid) {
         osName = 'Android';
         osSub = 'Mobile Device';
-        osIcon = 'fa-brands fa-android text-emerald-600';
+        osIcon = 'fa-brands fa-android text-emerald-700';
       } else if (isIOS) {
         osName = ua.includes('iPad') ? 'iPadOS' : 'iOS';
         osSub = ua.includes('iPhone') ? 'Apple iPhone' : 'Apple Device';
-        osIcon = 'fa-brands fa-apple text-slate-800';
+        osIcon = 'fa-brands fa-apple text-zinc-900';
       } else if (isMac) {
         osName = 'macOS';
         osSub = 'Apple Mac';
-        osIcon = 'fa-brands fa-apple text-slate-800';
+        osIcon = 'fa-brands fa-apple text-zinc-900';
       } else if (isLinux) {
         osName = 'Linux';
         osSub = 'Desktop / Server';
-        osIcon = 'fa-brands fa-linux text-amber-700';
+        osIcon = 'fa-brands fa-linux text-amber-800';
       }
 
-      // Browser detection
       let browserName = 'Chrome';
       if (ua.includes('Edg/')) browserName = 'Edge';
       else if (ua.includes('OPR/') || ua.includes('Opera')) browserName = 'Opera';
@@ -1367,7 +1631,6 @@
       else if (ua.includes('Chrome/') && !ua.includes('Edg/')) browserName = 'Chrome';
       else if (ua.includes('Safari/') && !ua.includes('Chrome')) browserName = 'Safari';
 
-      // Card 3 Elements (Per-device display)
       const cardOsDisplay = document.getElementById('cardOsDisplay');
       if (cardOsDisplay) cardOsDisplay.textContent = osName;
 
@@ -1377,7 +1640,6 @@
       const deviceOsIcon = document.getElementById('deviceOsIcon');
       if (deviceOsIcon) deviceOsIcon.className = osIcon + ' text-sm';
 
-      // Live Telemetry Grid Elements
       const bApiOs = document.getElementById('bApiOs');
       if (bApiOs) bApiOs.textContent = `${osName} (${osSub})`;
 
@@ -1395,28 +1657,23 @@
 
       const bApiMemory = document.getElementById('bApiMemory');
       if (bApiMemory) bApiMemory.textContent = navigator.deviceMemory ? `${navigator.deviceMemory} GB RAM` : '8 GB RAM';
-
-      const bApiNetwork = document.getElementById('bApiNetwork');
-      if (bApiNetwork) {
-        const netType = navigator.connection?.effectiveType ? navigator.connection.effectiveType.toUpperCase() : '4G/WiFi';
-        bApiNetwork.textContent = navigator.onLine ? `Online · ${netType}` : 'Offline';
-      }
     })();
 
-    // Ping
+    // 9. Live Ping Counter
     setInterval(() => {
       const ping = Math.floor(Math.random() * 10) + 16;
-      document.getElementById('pingMsDisplay').textContent = `${ping}ms`;
+      const el = document.getElementById('pingMsDisplay');
+      if (el) el.textContent = `${ping}ms`;
       const arc = document.getElementById('pingArc');
       if (arc) arc.style.strokeDashoffset = (150.79 * (1 - ping / 60)).toFixed(1);
     }, 4000);
 
-    // Filter Commands
+    // 10. Filter & Copy Commands
     function filterCommands(cat) {
       document.querySelectorAll('.cmd-filter-btn').forEach(btn => {
-        btn.className = 'cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-semibold text-slate-600 bg-white/80 hover:bg-white transition cursor-pointer';
+        btn.className = 'cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-extrabold text-zinc-700 bg-white/70 hover:bg-white transition cursor-pointer';
       });
-      event.target.className = 'cmd-filter-btn px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500 text-white shadow-sm cursor-pointer';
+      event.target.className = 'cmd-filter-btn px-3 py-1 rounded-full text-[11px] font-black bg-zinc-900 text-white shadow-sm cursor-pointer';
 
       document.querySelectorAll('.cmd-card').forEach(card => {
         if (cat === 'all' || card.getAttribute('data-cat') === cat) {
@@ -1430,6 +1687,7 @@
     function copyCommand(cmd) {
       navigator.clipboard.writeText(cmd).then(() => {
         addLog(`Copied: ${cmd}`, 'success');
+        playBubblePop(620);
       }).catch(() => {});
     }
   </script>
