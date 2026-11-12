@@ -1,0 +1,663 @@
+// commands/group-extra.js
+// Warn, Mute, Welcome/Goodbye, Promote/Demote, Group Settings, Antispam
+
+function getTarget(msg, args) {
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+    const quoted = msg.message?.extendedTextMessage?.contextInfo?.participant;
+    return mentioned || quoted || null;
+}
+
+// ---------- WARN ----------
+async function warnCommand(sock, from, msg, isAdmin, botData, saveBotData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user you want to warn." }, { quoted: msg });
+
+    if (!botData.warnings) botData.warnings = {};
+    if (!botData.warnings[from]) botData.warnings[from] = {};
+    botData.warnings[from][target] = (botData.warnings[from][target] || 0) + 1;
+    const count = botData.warnings[from][target];
+    saveBotData();
+
+    if (count >= 3) {
+        try {
+            await sock.sendMessage(from, { text: `⚠️ @${target.split('@')[0]} reached 3 warnings. Removing...`, mentions: [target] }, { quoted: msg });
+            await sock.groupParticipantsUpdate(from, [target], "remove");
+            botData.warnings[from][target] = 0;
+            saveBotData();
+        } catch (e) {
+            await sock.sendMessage(from, { text: "❌ Reached 3 warnings but I couldn't remove (need admin)." }, { quoted: msg });
+        }
+    } else {
+        await sock.sendMessage(from, { text: `⚠️ @${target.split('@')[0]} warned (${count}/3)`, mentions: [target] }, { quoted: msg });
+    }
+}
+
+async function unwarnCommand(sock, from, msg, isAdmin, botData, saveBotData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user." }, { quoted: msg });
+
+    if (!botData.warnings || !botData.warnings[from] || !botData.warnings[from][target]) {
+        return await sock.sendMessage(from, { text: "ℹ️ This user has no warnings." }, { quoted: msg });
+    }
+    botData.warnings[from][target] = Math.max(0, botData.warnings[from][target] - 1);
+    saveBotData();
+    await sock.sendMessage(from, { text: `✅ Warning removed. Now: ${botData.warnings[from][target]}/3`, mentions: [target] }, { quoted: msg });
+}
+
+// ---------- MUTE ----------
+async function muteCommand(sock, from, msg, isAdmin, botData, saveBotData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user you want to mute." }, { quoted: msg });
+
+    if (!botData.mutedUsers) botData.mutedUsers = {};
+    if (!botData.mutedUsers[from]) botData.mutedUsers[from] = {};
+    botData.mutedUsers[from][target] = true;
+    saveBotData();
+    await sock.sendMessage(from, { text: `🔇 @${target.split('@')[0]} has been muted in this group.`, mentions: [target] }, { quoted: msg });
+}
+
+async function unmuteCommand(sock, from, msg, isAdmin, botData, saveBotData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user you want to unmute." }, { quoted: msg });
+
+    if (botData.mutedUsers?.[from]) {
+        delete botData.mutedUsers[from][target];
+        saveBotData();
+    }
+    await sock.sendMessage(from, { text: `🔊 @${target.split('@')[0]} has been unmuted.`, mentions: [target] }, { quoted: msg });
+}
+
+// Called from index.js main message loop to enforce mute
+async function handleMuteCheck(sock, from, sender, msg, botData) {
+    if (!from.endsWith('@g.us')) return false;
+    if (botData.mutedUsers?.[from]?.[sender]) {
+        try { await sock.sendMessage(from, { delete: msg.key }); } catch (e) {}
+        return true;
+    }
+    return false;
+}
+
+// ---------- WELCOME / GOODBYE ----------
+const { generateWelcomeCard, fetchUserPfpBuffer } = require('../utils/welcomeCard');
+
+// Prevent duplicate welcome/goodbye card bursts when multiple events arrive simultaneously
+const recentWelcomeCache = new Map();
+
+async function welcomeCommand(sock, from, msg, isAdmin, botData, saveBotData, args) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    if (!botData.welcomeGoodbye) botData.welcomeGoodbye = {};
+    if (!botData.welcomeGoodbye[from]) botData.welcomeGoodbye[from] = {};
+
+    const rawArgs = (args || []).map(a => String(a).toLowerCase());
+    const wantsTest = rawArgs.includes('test') || rawArgs[0] === 'test';
+    const wantsOn = rawArgs.includes('on') || rawArgs[0] === 'on';
+    const wantsOff = rawArgs.includes('off') || rawArgs[0] === 'off';
+    const wantsSet = rawArgs[0] === 'set';
+
+    if (wantsOff && !wantsTest) {
+        botData.welcomeGoodbye[from].welcome = false;
+        saveBotData();
+        return await sock.sendMessage(from, { text: "❌ *Welcome messages disabled!*" }, { quoted: msg });
+    }
+
+    if (wantsOn) {
+        botData.welcomeGoodbye[from].welcome = true;
+        saveBotData();
+        if (!wantsTest) {
+            return await sock.sendMessage(from, { 
+                text: "✅ *Glowing Welcome Card enabled!*\n\nNaye members join hone par unki WhatsApp DP ke sath stylish Glowing Card auto-send hoga.\n💡 *Test karne ke liye type karein:* `.welcome test`" 
+            }, { quoted: msg });
+        }
+    }
+
+    if (wantsTest) {
+        // Send a live test welcome card to the group immediately
+        await sock.sendMessage(from, { react: { text: '✨', key: msg.key } }).catch(() => {});
+        try {
+            const isMe = msg.key?.fromMe;
+            let senderJid = msg.key?.participant || msg.participant;
+            if (!senderJid || isMe) {
+                senderJid = sock.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : (msg.key?.participant || msg.participant || from);
+            }
+            if (senderJid && senderJid.endsWith('@g.us')) {
+                senderJid = sock.user?.id ? (sock.user.id.split(':')[0] + '@s.whatsapp.net') : senderJid;
+            }
+
+            let rawNumber = String(senderJid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+            let phoneJid = `${rawNumber}@s.whatsapp.net`;
+            let lidJid = senderJid.endsWith('@lid') ? senderJid : null;
+
+            // Fast group metadata query with 3s fallback
+            let memberCount = 1;
+            let groupSubject = 'Our Group';
+            let gmeta = null;
+            try {
+                const metaPromise = sock.groupMetadata(from);
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+                gmeta = await Promise.race([metaPromise, timeoutPromise]);
+                if (gmeta) {
+                    memberCount = (gmeta.participants || []).length || 1;
+                    groupSubject = gmeta.subject || groupSubject;
+
+                    // Match sender in participants to resolve LID <-> Phone
+                    const part = gmeta.participants.find(p => 
+                        (p.id && (p.id === senderJid || p.id.split('@')[0].split(':')[0] === rawNumber)) ||
+                        (p.lid && (p.lid === senderJid || p.lid.split('@')[0].split(':')[0] === rawNumber))
+                    );
+                    if (part) {
+                        if (part.id) {
+                            phoneJid = part.id.split(':')[0] + '@s.whatsapp.net';
+                            rawNumber = phoneJid.split('@')[0].replace(/[^0-9]/g, '');
+                        }
+                        if (part.lid) {
+                            lidJid = part.lid.split(':')[0] + '@lid';
+                        }
+                    }
+                }
+            } catch {}
+
+            const targetCandidates = [phoneJid, lidJid, senderJid].filter(Boolean);
+            const avatarBuffer = await fetchUserPfpBuffer(sock, targetCandidates);
+            const cardBuffer = await generateWelcomeCard(avatarBuffer, {
+                type: 'WELCOME',
+                memberNumber: memberCount,
+                groupName: groupSubject
+            });
+
+            const userTag = `@${rawNumber}`;
+            const caption =
+`╔════════════════════════════════╗
+  ✨ 𝓦𝓔𝓛𝓒𝓞𝓜𝓔 ✨
+╚════════════════════════════════╝
+
+👋 *Assalam-o-Alaikum* ${userTag}!
+🎉 Welcome to *${groupSubject}*!
+
+👥 *Member:* #${memberCount}
+📜 *Rules:* Follow the group rules and have fun!
+
+⚡ *Powered by MR SAQIB MD*`;
+
+            const mentionJids = [...new Set([phoneJid, senderJid, cleanJid = `${rawNumber}@s.whatsapp.net`])].filter(Boolean);
+
+            await sock.sendMessage(from, {
+                image: cardBuffer,
+                caption: caption,
+                mentions: mentionJids
+            }, { quoted: msg });
+
+        } catch (err) {
+            console.error('[Test Welcome Error]:', err);
+            await sock.sendMessage(from, { text: `❌ Test welcome failed: ${err.message}` }, { quoted: msg });
+        }
+    } else if (wantsSet) {
+        const customMsg = args.slice(1).join(' ');
+        if (!customMsg) return await sock.sendMessage(from, { text: "❌ Usage: .welcome set <message> (use {user} for mention, {group} for group name)" }, { quoted: msg });
+        botData.welcomeGoodbye[from].welcomeMsg = customMsg;
+        saveBotData();
+        await sock.sendMessage(from, { text: "✅ Custom welcome message set!" }, { quoted: msg });
+    } else if (!wantsOn && !wantsOff) {
+        const status = botData.welcomeGoodbye[from]?.welcome ? "🟢 ENABLED" : "🔴 DISABLED";
+        await sock.sendMessage(from, { 
+            text: 
+`╭━━━〔 ⚡ *WELCOME SYSTEM* ⚡ 〕━━━┈⊷
+┃ 📊 *Current Status:* ${status}
+┃
+┃ 📸 *Commands:*
+┃ 👉 *.welcome on*    — Enable Stylish DP Welcome Card
+┃ 👉 *.welcome off*   — Disable Welcome
+┃ 👉 *.welcome test*  — Test Card Right Now!
+┃ 👉 *.welcome set <text>* — Custom text
+┃
+┃ ✨ *Features:*
+┃ ✦ Member ki actual profile picture automatically circular frame mein aayegi!
+┃ ✦ Glowing neon ring & Member # count!
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+        }, { quoted: msg });
+    }
+}
+
+async function goodbyeCommand(sock, from, msg, isAdmin, botData, saveBotData, args) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    if (!botData.welcomeGoodbye) botData.welcomeGoodbye = {};
+    if (!botData.welcomeGoodbye[from]) botData.welcomeGoodbye[from] = {};
+
+    const rawArgs = (args || []).map(a => String(a).toLowerCase());
+    const wantsTest = rawArgs.includes('test') || rawArgs[0] === 'test';
+    const wantsOn = rawArgs.includes('on') || rawArgs[0] === 'on';
+    const wantsOff = rawArgs.includes('off') || rawArgs[0] === 'off';
+    const wantsSet = rawArgs[0] === 'set';
+
+    if (wantsOff && !wantsTest) {
+        botData.welcomeGoodbye[from].goodbye = false;
+        saveBotData();
+        return await sock.sendMessage(from, { text: "❌ *Goodbye messages disabled!*" }, { quoted: msg });
+    }
+
+    if (wantsOn) {
+        botData.welcomeGoodbye[from].goodbye = true;
+        saveBotData();
+        if (!wantsTest) {
+            return await sock.sendMessage(from, { text: "✅ *Glowing Goodbye Card enabled!*" }, { quoted: msg });
+        }
+    }
+
+    if (wantsTest) {
+        await sock.sendMessage(from, { react: { text: '🥀', key: msg.key } }).catch(() => {});
+        try {
+            let senderJid = msg.key.participant || msg.participant || (msg.key.fromMe ? sock?.user?.id : '') || msg.key.remoteJid || '';
+            let rawNumber = String(senderJid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+            let phoneJid = rawNumber ? `${rawNumber}@s.whatsapp.net` : '';
+            let lidJid = '';
+            if (String(senderJid).endsWith('@lid')) {
+                lidJid = String(senderJid).split(':')[0] + '@lid';
+            }
+
+            let memberCount = 1;
+            let groupSubject = 'Our Group';
+            try {
+                const metaPromise = sock.groupMetadata(from);
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2500));
+                const gmeta = await Promise.race([metaPromise, timeoutPromise]);
+                if (gmeta) {
+                    memberCount = (gmeta.participants || []).length || 1;
+                    groupSubject = gmeta.subject || groupSubject;
+
+                    // Match participant to resolve phone JID & LID
+                    const part = (gmeta.participants || []).find(p => 
+                        p.id === senderJid || 
+                        p.lid === senderJid ||
+                        p.id?.startsWith(rawNumber) ||
+                        p.lid?.startsWith(rawNumber)
+                    );
+                    if (part) {
+                        if (part.id) {
+                            phoneJid = part.id.split(':')[0] + '@s.whatsapp.net';
+                            rawNumber = phoneJid.split('@')[0].replace(/[^0-9]/g, '');
+                        }
+                        if (part.lid) {
+                            lidJid = part.lid.split(':')[0] + '@lid';
+                        }
+                    }
+                }
+            } catch {}
+
+            const targetCandidates = [phoneJid, lidJid, senderJid].filter(Boolean);
+            const avatarBuffer = await fetchUserPfpBuffer(sock, targetCandidates);
+            const cardBuffer = await generateWelcomeCard(avatarBuffer, {
+                type: 'GOODBYE',
+                memberNumber: memberCount,
+                groupName: groupSubject
+            });
+
+            const userTag = `@${rawNumber}`;
+            const caption =
+`╔════════════════════════════════╗
+  🥀 𝓖𝓞𝓞𝓓𝓑𝓨𝓔 🥀
+╚════════════════════════════════╝
+
+👋 *Goodbye* ${userTag}!
+We will miss you in *${groupSubject}*!
+
+⚡ *Powered by MR SAQIB MD*`;
+
+            await sock.sendMessage(from, {
+                image: cardBuffer,
+                caption: caption,
+                mentions: [cleanJid, senderJid]
+            }, { quoted: msg });
+
+        } catch (err) {
+            console.error('[Test Goodbye Error]:', err);
+            await sock.sendMessage(from, { text: `❌ Test goodbye failed: ${err.message}` }, { quoted: msg });
+        }
+    } else if (wantsSet) {
+        const customMsg = args.slice(1).join(' ');
+        if (!customMsg) return await sock.sendMessage(from, { text: "❌ Usage: .goodbye set <message> (use {user} for mention)" }, { quoted: msg });
+        botData.welcomeGoodbye[from].goodbyeMsg = customMsg;
+        saveBotData();
+        await sock.sendMessage(from, { text: "✅ Custom goodbye message set!" }, { quoted: msg });
+    } else if (!wantsOn && !wantsOff) {
+        await sock.sendMessage(from, { text: "❌ Usage: .goodbye [on/off/test/set <message>]" }, { quoted: msg });
+    }
+}
+
+// Called from group-participants.update listener & messages.upsert stub events in index.js
+async function handleGroupParticipantsUpdate(sock, update, botData) {
+    try {
+        const { id: from, participants, action } = update;
+        if (!from || !from.endsWith('@g.us')) return;
+
+        const cfg = botData.welcomeGoodbye?.[from];
+        if (!cfg) return;
+
+        const isAdd = ['add', 'invite', 'join'].includes(action);
+        const isRemove = ['remove', 'leave'].includes(action);
+
+        if (!isAdd && !isRemove) return;
+        if (isAdd && !cfg.welcome) return;
+        if (isRemove && !cfg.goodbye) return;
+
+        let memberCount = 1;
+        let groupSubject = 'Our Group';
+        try {
+            const metaPromise = sock.groupMetadata(from);
+            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 2500));
+            const gmeta = await Promise.race([metaPromise, timeoutPromise]);
+            if (gmeta) {
+                memberCount = (gmeta.participants || []).length || 1;
+                groupSubject = gmeta.subject || groupSubject;
+            }
+        } catch {}
+
+        for (const p of participants) {
+            const rawJid = typeof p === 'string' ? p : (p?.id || p?.jid);
+            if (!rawJid) continue;
+
+            let rawNumber = String(rawJid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+            let phoneJid = `${rawNumber}@s.whatsapp.net`;
+            let lidJid = rawJid.endsWith('@lid') ? rawJid : null;
+
+            // Match member in groupMetadata to resolve Phone <-> LID
+            if (gmeta && gmeta.participants) {
+                const part = gmeta.participants.find(m => 
+                    (m.id && (m.id === rawJid || m.id.split('@')[0].split(':')[0] === rawNumber)) ||
+                    (m.lid && (m.lid === rawJid || m.lid.split('@')[0].split(':')[0] === rawNumber))
+                );
+                if (part) {
+                    if (part.id) {
+                        phoneJid = part.id.split(':')[0] + '@s.whatsapp.net';
+                        rawNumber = phoneJid.split('@')[0].replace(/[^0-9]/g, '');
+                    }
+                    if (part.lid) {
+                        lidJid = part.lid.split(':')[0] + '@lid';
+                    }
+                }
+            }
+
+            const tag = `@${rawNumber}`;
+            const targetCandidates = [phoneJid, lidJid, rawJid].filter(Boolean);
+
+            // Debounce: prevent duplicate welcome/goodbye cards to same user within 15 seconds
+            const cacheKey = `${from}_${rawNumber}_${isAdd ? 'add' : 'remove'}`;
+            const lastSent = recentWelcomeCache.get(cacheKey) || 0;
+            if (Date.now() - lastSent < 15000) {
+                continue;
+            }
+            recentWelcomeCache.set(cacheKey, Date.now());
+
+            console.log(`[Welcome/Goodbye Action] Group: ${from} | Action: ${isAdd ? 'WELCOME' : 'GOODBYE'} | User: ${phoneJid} (LID: ${lidJid || 'none'})`);
+
+            if (isAdd && cfg.welcome) {
+                try {
+                    const avatarBuffer = await fetchUserPfpBuffer(sock, targetCandidates);
+                    const cardBuffer = await generateWelcomeCard(avatarBuffer, {
+                        type: 'WELCOME',
+                        memberNumber: memberCount,
+                        groupName: groupSubject
+                    });
+
+                    const caption = cfg.welcomeMsg 
+                        ? cfg.welcomeMsg.replace(/\{user\}/gi, tag).replace(/\{group\}/gi, groupSubject)
+                        : 
+`╔════════════════════════════════╗
+  ✨ 𝓦𝓔𝓛𝓒𝓞𝓜𝓔 ✨
+╚════════════════════════════════╝
+
+👋 *Assalam-o-Alaikum* ${tag}!
+🎉 Welcome to *${groupSubject}*!
+
+👥 *Member:* #${memberCount}
+📜 *Rules:* Follow the group rules and respect members!
+
+⚡ *Powered by MR SAQIB MD*`;
+
+                    const mentionJids = [...new Set([phoneJid, lidJid, rawJid])].filter(Boolean);
+
+                    await sock.sendMessage(from, {
+                        image: cardBuffer,
+                        caption: caption,
+                        mentions: mentionJids
+                    });
+                } catch (cardErr) {
+                    console.error('[Welcome Card Error]:', cardErr.message);
+                    const template = cfg.welcomeMsg || `👋 Welcome {user} to *${groupSubject}*!`;
+                    await sock.sendMessage(from, { text: template.replace(/\{user\}/gi, tag), mentions: [phoneJid] });
+                }
+            } else if (isRemove && cfg.goodbye) {
+                try {
+                    const avatarBuffer = await fetchUserPfpBuffer(sock, targetCandidates);
+                    const cardBuffer = await generateWelcomeCard(avatarBuffer, {
+                        type: 'GOODBYE',
+                        memberNumber: memberCount,
+                        groupName: groupSubject
+                    });
+
+                    const caption = cfg.goodbyeMsg
+                        ? cfg.goodbyeMsg.replace(/\{user\}/gi, tag).replace(/\{group\}/gi, groupSubject)
+                        :
+`╔════════════════════════════════╗
+  🥀 𝓖𝓞𝓞𝓓𝓑𝓨𝓔 🥀
+╚════════════════════════════════╝
+
+👋 *Goodbye* ${tag}!
+We will miss you in *${groupSubject}*!
+
+⚡ *Powered by MR SAQIB MD*`;
+
+                    const mentionJids = [...new Set([phoneJid, lidJid, rawJid])].filter(Boolean);
+
+                    await sock.sendMessage(from, {
+                        image: cardBuffer,
+                        caption: caption,
+                        mentions: mentionJids
+                    });
+                } catch (cardErr) {
+                    console.error('[Goodbye Card Error]:', cardErr.message);
+                    const template = cfg.goodbyeMsg || `👋 Goodbye {user}, take care!`;
+                    await sock.sendMessage(from, { text: template.replace(/\{user\}/gi, tag), mentions: [cleanJid] });
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Welcome/Goodbye Error:', e);
+    }
+}
+
+// ---------- PROMOTE / DEMOTE ----------
+async function promoteCommand(sock, from, msg, isAdmin) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user you want to promote." }, { quoted: msg });
+    try {
+        await sock.groupParticipantsUpdate(from, [target], "promote");
+        await sock.sendMessage(from, { text: `✅ @${target.split('@')[0]} is now an admin.`, mentions: [target] }, { quoted: msg });
+    } catch (e) {
+        await sock.sendMessage(from, { text: "❌ Failed to promote. Make sure I am an admin." }, { quoted: msg });
+    }
+}
+
+async function demoteCommand(sock, from, msg, isAdmin) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user you want to demote." }, { quoted: msg });
+    try {
+        await sock.groupParticipantsUpdate(from, [target], "demote");
+        await sock.sendMessage(from, { text: `✅ @${target.split('@')[0]} is no longer an admin.`, mentions: [target] }, { quoted: msg });
+    } catch (e) {
+        await sock.sendMessage(from, { text: "❌ Failed to demote. Make sure I am an admin." }, { quoted: msg });
+    }
+}
+
+// ---------- GROUP SETTINGS ----------
+async function groupsettingsCommand(sock, from, msg, isAdmin, botData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const on = (v) => v ? '✅' : '❌';
+    const text =
+        `⚙️ *Group Settings*\n\n` +
+        `🔗 Antilink: ${botData.antilinkGroups?.[from] ? on(true) + ' (' + botData.antilinkGroups[from] + ')' : on(false)}\n` +
+        `🛡️ Antispam: ${on(botData.antispamGroups?.[from])}\n` +
+        `📛 Antistatus: ${on(botData.antiStatusGroups?.[from])}\n` +
+        `👋 Welcome: ${on(botData.welcomeGoodbye?.[from]?.welcome)}\n` +
+        `🚪 Goodbye: ${on(botData.welcomeGoodbye?.[from]?.goodbye)}\n` +
+        `🚫 Kick-Offline: ${on(botData.kickOffline?.[from])}`;
+    await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// ---------- ANTISPAM ----------
+const spamTracker = {};
+
+async function antispamCommand(sock, from, msg, isAdmin, botData, saveBotData, args) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    if (!botData.antispamGroups) botData.antispamGroups = {};
+    const action = args[0]?.toLowerCase();
+    if (action === 'on') {
+        botData.antispamGroups[from] = true;
+        saveBotData();
+        await sock.sendMessage(from, { text: "✅ Antispam Enabled! (max 6 messages / 10 sec)" }, { quoted: msg });
+    } else if (action === 'off') {
+        botData.antispamGroups[from] = false;
+        saveBotData();
+        await sock.sendMessage(from, { text: "❌ Antispam Disabled!" }, { quoted: msg });
+    } else {
+        await sock.sendMessage(from, { text: "❌ Usage: .antispam [on/off]" }, { quoted: msg });
+    }
+}
+
+// Called from index.js main message loop
+async function handleAntispam(sock, from, sender, msg, botData, isAdmin) {
+    if (!from.endsWith('@g.us') || isAdmin || !botData.antispamGroups?.[from]) return false;
+    const key = from + '_' + sender;
+    const now = Date.now();
+    if (!spamTracker[key]) spamTracker[key] = [];
+    spamTracker[key] = spamTracker[key].filter(t => now - t < 10000);
+    spamTracker[key].push(now);
+
+    if (spamTracker[key].length > 6) {
+        try {
+            await sock.sendMessage(from, { delete: msg.key });
+            await sock.sendMessage(from, { text: `⚠️ @${sender.split('@')[0]} please slow down (spam detected).`, mentions: [sender] });
+        } catch (e) {}
+        return true;
+    }
+    return false;
+}
+
+async function resetwarnCommand(sock, from, msg, isAdmin, botData, saveBotData) {
+    if (!isAdmin || !from.endsWith('@g.us')) return await sock.sendMessage(from, { text: "❌ Only admin can use this command in groups." }, { quoted: msg });
+    const target = getTarget(msg);
+    if (!target) return await sock.sendMessage(from, { text: "❌ Reply to or tag the user to reset warnings." }, { quoted: msg });
+
+    if (botData.warnings?.[from]?.[target]) {
+        botData.warnings[from][target] = 0;
+        saveBotData();
+    }
+    await sock.sendMessage(from, { text: `✅ Warnings reset to 0 for @${target.split('@')[0]}`, mentions: [target] }, { quoted: msg });
+}
+
+// Export group contacts as .vcf file
+async function vcfCommand(sock, from, msg, isAdmin) {
+    try {
+        if (!from.endsWith('@g.us')) {
+            return await sock.sendMessage(from, { text: "❌ Yeh command sirf WhatsApp groups me kaam karti hai." }, { quoted: msg });
+        }
+
+        await sock.sendMessage(from, { react: { text: '📇', key: msg.key } }).catch(() => {});
+
+        const metadata = await sock.groupMetadata(from);
+        const participants = metadata.participants || [];
+
+        let vcfData = '';
+        participants.forEach((p, idx) => {
+            const num = p.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+            if (num) {
+                vcfData += `BEGIN:VCARD\nVERSION:3.0\nFN:${metadata.subject || 'Group'} Member ${idx + 1}\nTEL;type=CELL;type=VOICE;waid=${num}:+${num}\nEND:VCARD\n`;
+            }
+        });
+
+        const vcfBuffer = Buffer.from(vcfData, 'utf8');
+        const cleanName = (metadata.subject || 'Group_Contacts').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        await sock.sendMessage(from, {
+            document: vcfBuffer,
+            mimetype: 'text/vcard',
+            fileName: `${cleanName}_Contacts.vcf`,
+            caption: `╭━━━〔 📇 *GROUP VCF EXPORTER* 〕━━━┈⊷\n┃ 👥 *Total Contacts:* ${participants.length}\n┃ 📂 *Group:* ${metadata.subject}\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n💡 *Tip:* File open karke direct contacts save karein!`
+        }, { quoted: msg });
+
+    } catch (e) {
+        await sock.sendMessage(from, { text: `❌ VCF export error: ${e.message}` }, { quoted: msg });
+    }
+}
+
+// Create WhatsApp interactive poll
+async function pollCommand(sock, from, msg, args = []) {
+    try {
+        const raw = args.join(' ');
+        if (!raw.includes('|')) {
+            return await sock.sendMessage(from, {
+                text: "❌ *Usage:* `.poll Question | Option 1 | Option 2 | Option 3`\n_Example: .poll Match kaun jeetega? | Pakistan | India_"
+            }, { quoted: msg });
+        }
+
+        const parts = raw.split('|').map(s => s.trim()).filter(Boolean);
+        const question = parts[0];
+        const options = parts.slice(1);
+
+        if (options.length < 2) {
+            return await sock.sendMessage(from, { text: "❌ Poll ke liye kam se kam 2 options dena zaroori hain." }, { quoted: msg });
+        }
+
+        await sock.sendMessage(from, {
+            poll: {
+                name: `📊 ${question}`,
+                values: options.slice(0, 12),
+                selectableCount: 1
+            }
+        });
+
+    } catch (e) {
+        await sock.sendMessage(from, { text: `❌ Poll error: ${e.message}` }, { quoted: msg });
+    }
+}
+
+// Active members / group info
+async function onlineCommand(sock, from, msg) {
+    try {
+        if (!from.endsWith('@g.us')) {
+            return await sock.sendMessage(from, { text: "❌ Sirf group me kaam karta hai." }, { quoted: msg });
+        }
+
+        const metadata = await sock.groupMetadata(from);
+        const total = metadata.participants?.length || 0;
+        const admins = metadata.participants?.filter(p => p.admin || p.isAdmin)?.length || 0;
+
+        const text = 
+`╭━━━〔 👥 *GROUP ACTIVE STATS* 〕━━━┈⊷
+┃ 🏷️ *Group:* ${metadata.subject}
+┃ 👥 *Total Members:* ${total}
+┃ 👑 *Admins:* ${admins}
+┃ 🛡️ *Restrict:* ${metadata.restrict ? 'Admins Only' : 'Everyone'}
+┃ 💬 *Announce:* ${metadata.announce ? 'Only Admins Can Send' : 'All Members Can Send'}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
+🚀 *MR SAQIB MD*`;
+
+        await sock.sendMessage(from, { text }, { quoted: msg });
+    } catch (e) {
+        await sock.sendMessage(from, { text: `❌ Error: ${e.message}` }, { quoted: msg });
+    }
+}
+
+module.exports = {
+    warnCommand, unwarnCommand, resetwarnCommand,
+    muteCommand, unmuteCommand, handleMuteCheck,
+    welcomeCommand, goodbyeCommand, handleGroupParticipantsUpdate,
+    promoteCommand, demoteCommand,
+    groupsettingsCommand,
+    antispamCommand, handleAntispam,
+    vcfCommand, pollCommand, onlineCommand
+};

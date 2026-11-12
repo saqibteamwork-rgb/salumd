@@ -1,0 +1,909 @@
+'use strict';
+
+/**
+ * MR SAQIB MD :: ADVANCED CHANNEL AUTO REACT & AUTO JOIN ENGINE
+ * ============================================================================
+ * Commands:
+ * - .arc add <link> [emojis] [count] [delay=5s] <passcode>
+ * - .arclist
+ * - .arcdel <link>
+ * - .arcstop <link|all>
+ * - .arcstart <link|all>
+ * - .chautojoin <link> / .autojoin <link> / .chjoin <link>
+ * - .chreact, .chreactall, .chunreact
+ * - .pollrand, .pollunvote, .pollvfix, .pollvinfo, .pollvote, .pollvstop
+ * ============================================================================
+ */
+
+const fs = require('fs-extra');
+const path = require('path');
+const hub = require('../utils/channelHub');
+const { 
+  executeMultiSessionReaction, 
+  executeMultiSessionChannelPollVote,
+  extractQuotedPoll,
+  getActiveSockets 
+} = require('./chreact');
+
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const ARC_FILE = path.join(DATA_DIR, 'channel_arc.json');
+
+fs.ensureDirSync(DATA_DIR);
+
+function loadArcData() {
+  try {
+    if (fs.existsSync(ARC_FILE)) {
+      const data = fs.readJsonSync(ARC_FILE) || {};
+      if (!data.channels) data.channels = {};
+      if (!data.blocked) data.blocked = {};
+      if (typeof data.enabled !== 'boolean') data.enabled = true;
+      if (!data.passcode) data.passcode = 'arc123';
+      return data;
+    }
+  } catch (e) {
+    console.error('[ARC Load Error]:', e.message);
+  }
+  return {
+    enabled: true,
+    locked: false,
+    passcode: 'arc123',
+    channels: {},      // { [jid]: { jid, name, link, emojis: ['❤️','🔥'], count: 3, delayMs: 5000, enabled: true, lastReactedId: '' } }
+    blocked: {},       // { [jid]: true }
+    defaultEmoji: '❤️'
+  };
+}
+
+function saveArcData(data) {
+  try {
+    fs.writeJsonSync(ARC_FILE, data, { spaces: 2 });
+  } catch (e) {
+    console.error('[ARC Save Error]:', e.message);
+  }
+}
+
+function parseDelay(str) {
+  if (!str) return 5000;
+  const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+  if (isNaN(num) || num <= 0) return 5000;
+  if (str.toLowerCase().includes('m')) return num * 60 * 1000;
+  if (str.toLowerCase().includes('s')) return num * 1000;
+  if (num < 100) return num * 1000; // e.g. 5 -> 5000ms
+  return num;
+}
+
+function normalizeChannelInput(str) {
+  if (!str) return null;
+  const linkMatch = str.match(/whatsapp\.com\/channel\/([0-9A-Za-z_-]+)/i);
+  if (linkMatch) return { code: linkMatch[1], raw: str };
+  const jidMatch = str.match(/([0-9]+@newsletter)/i);
+  if (jidMatch) return { jid: jidMatch[1], raw: str };
+  if (/^[0-9]+$/.test(str.trim())) return { jid: `${str.trim()}@newsletter`, raw: str };
+  return null;
+}
+
+const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+const arcReactedPosts = new Set();
+
+/**
+ * Automatically joins/follows a channel across ALL connected bot accounts
+ */
+async function joinChannelAcrossAllSessions(primarySock, targetJid, inviteCode = null) {
+  const uniqueSocks = getActiveSockets(primarySock);
+  const results = [];
+
+  for (const s of uniqueSocks) {
+    const acct = hub.accountOf(s) || 'Session';
+    try {
+      if (inviteCode && typeof s.newsletterMetadata === 'function') {
+        await s.newsletterMetadata('invite', inviteCode).catch(() => {});
+      }
+      if (typeof s.newsletterFollow === 'function') {
+        await s.newsletterFollow(targetJid).catch(() => {});
+      }
+      if (typeof s.subscribeNewsletterUpdates === 'function') {
+        await s.subscribeNewsletterUpdates(targetJid).catch(() => {});
+      }
+      results.push({ account: acct, success: true });
+    } catch (e) {
+      results.push({ account: acct, success: false, error: e.message });
+    }
+  }
+
+  return { uniqueSocks, results };
+}
+
+/**
+ * Silently executes multi-session reactions on incoming newsletter posts
+ * according to the channel's ARC configuration.
+ */
+async function executeArcAutoReaction(primarySock, channelJid, serverId, conf) {
+  if (!channelJid || !serverId || !conf) return;
+  const postKey = `${channelJid}:${serverId}`;
+  if (arcReactedPosts.has(postKey)) return;
+  arcReactedPosts.add(postKey);
+
+  if (arcReactedPosts.size > 500) {
+    const firstKey = arcReactedPosts.values().next().value;
+    arcReactedPosts.delete(firstKey);
+  }
+
+  // Delay if configured (default: 3000ms)
+  const delayMs = conf.delayMs || 3000;
+  if (delayMs > 0) {
+    await sleep(delayMs);
+  }
+
+  const uniqueSocks = getActiveSockets(primarySock);
+  const emojis = (Array.isArray(conf.emojis) && conf.emojis.length > 0)
+    ? conf.emojis
+    : (conf.emoji ? [conf.emoji] : ['❤️']);
+
+  const targetCount = (conf.count && conf.count > 0)
+    ? Math.min(conf.count, uniqueSocks.length)
+    : uniqueSocks.length;
+
+  console.log(`[ARC Auto-React] ⚡ Channel: ${conf.name || channelJid} | Post ID: ${serverId} | Sessions: ${targetCount} | Emojis: ${emojis.join(' ')}`);
+
+  let successCount = 0;
+  for (let i = 0; i < targetCount; i++) {
+    const s = uniqueSocks[i];
+    const emoji = emojis[i % emojis.length];
+    try {
+      if (typeof s.newsletterReactMessage === 'function') {
+        await s.newsletterReactMessage(channelJid, String(serverId), emoji);
+        successCount++;
+      }
+    } catch (e) {
+      console.error(`[ARC Reaction Error] Session ${hub.accountOf(s)} failed:`, e.message);
+    }
+    if (i < targetCount - 1) {
+      await sleep(350);
+    }
+  }
+
+  console.log(`[ARC Auto-React] ✅ Done: ${successCount}/${targetCount} reacted on post ${serverId}`);
+}
+
+// 1. .arc [add | list | del | stop | on | off] - Main Controller
+async function arcCommand(sock, from, msg, isOwner, args = []) {
+  const data = loadArcData();
+  const subCmd = (args[0] || '').toLowerCase();
+
+  // Show list if: .arc list
+  if (subCmd === 'list' || subCmd === 'ls') {
+    return await arclistCommand(sock, from, msg);
+  }
+
+  // Delete if: .arc del <link>
+  if (subCmd === 'del' || subCmd === 'delete' || subCmd === 'remove' || subCmd === 'rm') {
+    return await arcdelCommand(sock, from, msg, isOwner, args.slice(1));
+  }
+
+  // Stop if: .arc stop [link|all]
+  if (subCmd === 'stop' || subCmd === 'pause') {
+    return await arcstopCommand(sock, from, msg, isOwner, args.slice(1));
+  }
+
+  // Start if: .arc start [link|all]
+  if (subCmd === 'start' || subCmd === 'resume') {
+    return await arcstartCommand(sock, from, msg, isOwner, args.slice(1));
+  }
+
+  // Global toggle: .arc on / .arc off
+  if (subCmd === 'on') {
+    data.enabled = true;
+    saveArcData(data);
+    return await sock.sendMessage(from, { text: "✅ *Auto Channel Reaction (ARC) ENABLE ho gaya!*" }, { quoted: msg });
+  }
+  if (subCmd === 'off') {
+    data.enabled = false;
+    saveArcData(data);
+    return await sock.sendMessage(from, { text: "🛑 *Auto Channel Reaction (ARC) DISABLE ho gaya!*" }, { quoted: msg });
+  }
+
+  // ---------------------------------------------------------------------------
+  // .arc add <link> [emojis] [count] [delay=5s] <passcode>
+  // ---------------------------------------------------------------------------
+  if (subCmd === 'add' || (args[0] && (args[0].includes('whatsapp.com/channel') || args[0].includes('@newsletter')))) {
+    if (!isOwner) {
+      return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner channels add kar sakta hai!*" }, { quoted: msg });
+    }
+
+    if (data.locked) {
+      return await sock.sendMessage(from, { text: "🔒 *ARC settings locked hain! Pehle `.arcunlock` karein.*" }, { quoted: msg });
+    }
+
+    // Shift arguments if user typed `.arc add ...` vs `.arc <link> ...`
+    const rawParams = subCmd === 'add' ? args.slice(1) : args;
+    const rawLink = rawParams[0];
+
+    if (!rawLink) {
+      return await sock.sendMessage(from, {
+        text:
+`╭━━━〔 📌 *ARC USAGE GUIDE* 〕━━━┈⊷
+┃ 👉 *.arc add <link> [emojis] [count] [delay=5s] <passcode>*
+┃
+┃ 📝 *Parameters:*
+┃ 🔗 *link:* WhatsApp channel link ya JID
+┃ ✨ *emojis:* Reaction emojis (e.g. ❤️,🔥,⚡ ya 'all')
+┃ 🔢 *count:* Kitne reactions lagane hain (e.g. 3, 5, all)
+┃ ⏳ *delay:* Har post ke reaction ka delay (default: 5s)
+┃ 🔑 *passcode:* Owner confirmation code (e.g. arc123)
+┃
+┃ 📋 *Examples:*
+┃ • \`.arc add https://whatsapp.com/channel/0029Va... ❤️,🔥 3 5s arc123\`
+┃ • \`.arc add https://whatsapp.com/channel/0029Va... 🔥\`
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+      }, { quoted: msg });
+    }
+
+    const norm = normalizeChannelInput(rawLink);
+    if (!norm) {
+      return await sock.sendMessage(from, { text: "❌ *Invalid channel link ya JID!*" }, { quoted: msg });
+    }
+
+    await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+
+    let targetJid = norm.jid;
+    let channelName = 'WhatsApp Channel';
+    let inviteCode = norm.code || null;
+
+    // Resolve invite code to JID and Name via Baileys
+    if (norm.code) {
+      try {
+        const metadata = await sock.newsletterMetadata('invite', norm.code);
+        targetJid = metadata.id;
+        channelName = metadata.name || channelName;
+      } catch (e) {
+        return await sock.sendMessage(from, { text: `❌ *Channel link resolve nahi hua:* ${e.message}` }, { quoted: msg });
+      }
+    } else if (targetJid) {
+      try {
+        const metadata = await sock.newsletterMetadata('jid', targetJid);
+        channelName = metadata.name || channelName;
+      } catch {}
+    }
+
+    if (!targetJid) {
+      return await sock.sendMessage(from, { text: "❌ *Channel resolve nahi ho saka!*" }, { quoted: msg });
+    }
+
+    // Parse options: emojis, count, delay, passcode
+    let emojisArg = rawParams[1] || '❤️,🔥,👍';
+    let countArg = rawParams[2] || 'all';
+    let delayArg = rawParams[3] || '5s';
+    let passArg = rawParams[4] || '';
+
+    // Handle shifting if a param was skipped
+    if (emojisArg && (emojisArg.endsWith('s') || /^[0-9]+$/.test(emojisArg))) {
+      // User passed count or delay as 2nd arg
+      countArg = emojisArg;
+      emojisArg = '❤️,🔥';
+    }
+
+    const emojisList = emojisArg.split(/[\s,]+/).filter(Boolean);
+    const delayMs = parseDelay(delayArg);
+    const count = (countArg.toLowerCase() === 'all' || isNaN(parseInt(countArg, 10))) ? 0 : parseInt(countArg, 10);
+
+    // Verify passcode if set and provided
+    if (data.passcode && passArg && passArg !== data.passcode) {
+      return await sock.sendMessage(from, { text: "❌ *Invalid Passcode!* Please check your ARC passcode." }, { quoted: msg });
+    }
+
+    // Auto Follow/Join across ALL connected bot accounts
+    const joinResult = await joinChannelAcrossAllSessions(sock, targetJid, inviteCode);
+
+    if (!data.channels) data.channels = {};
+    data.channels[targetJid] = {
+      jid: targetJid,
+      name: channelName,
+      link: rawLink,
+      emojis: emojisList.length > 0 ? emojisList : ['❤️'],
+      count: count,
+      delayMs: delayMs,
+      delayStr: `${Math.round(delayMs / 1000)}s`,
+      enabled: true,
+      addedAt: Date.now(),
+      lastPostId: null
+    };
+
+    saveArcData(data);
+
+    await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
+
+    const joinedCount = joinResult.results.filter(r => r.success).length;
+    const totalSessions = joinResult.uniqueSocks.length;
+
+    return await sock.sendMessage(from, {
+      text:
+`╭━━━〔 ✅ *CHANNEL AUTO-REACT ADDED* 〕━━━┈⊷
+┃ 📢 *Channel:* *${channelName}*
+┃ 🆔 *JID:* \`${targetJid}\`
+┃ ✨ *Emojis:* ${emojisList.join(' ')}
+┃ 🔢 *Reaction Count:* ${count === 0 ? `All (${totalSessions} Sessions)` : count}
+┃ ⏳ *Reaction Delay:* ${Math.round(delayMs / 1000)}s
+┃ 👥 *Auto-Followed:* ${joinedCount}/${totalSessions} Bot Accounts
+┃ 🟢 *Auto React:* Active & Monitoring
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
+
+💡 *Ab is channel par aane wali har post par auto reaction lagta rahega!*
+👉 List dekhne ke liye: *.arclist*
+👉 Stop karne ke liye: *.arcstop ${targetJid}*`
+    }, { quoted: msg });
+  }
+
+  // Default Status Dashboard
+  const status = data.enabled ? '🟢 Active' : '🔴 Stopped';
+  const count = Object.keys(data.channels || {}).length;
+  const text =
+`╭━━━〔 📢 *AUTO CHANNEL REACTION (ARC)* 〕━━━┈⊷
+┃ 📊 *Global Status:* ${status}
+┃ 🔒 *Lock:* ${data.locked ? 'Locked' : 'Unlocked'}
+┃ 📺 *Monitored Channels:* ${count}
+┃ 🚫 *Blocked Channels:* ${Object.keys(data.blocked || {}).length}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
+
+📌 *Usage:*
+👉 *.arc add <link> [emojis] [count] [delay=5s] <passcode>*
+👉 *.arclist*  |  *.arcdel <link>*  |  *.arcstop <link|all>*
+👉 *.chautojoin <link>* ➔ Tamam bot accounts se follow karein`;
+
+  await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// 2. .arclist - List all monitored channels
+async function arclistCommand(sock, from, msg) {
+  const data = loadArcData();
+  const entries = Object.entries(data.channels || {});
+
+  if (!entries.length) {
+    return await sock.sendMessage(from, {
+      text:
+`╭━━━〔 📢 *ARC MONITORED CHANNELS* 〕━━━┈⊷
+┃ 📭 Abhi tak koi channel ARC mein shamil nahi hai.
+┃
+┃ 💡 *Add Karne Ka Tarika:*
+┃ 👉 \`.arc add <channel_link> ❤️,🔥 3 5s\`
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+    }, { quoted: msg });
+  }
+
+  let text = `╭━━━〔 📢 *ARC MONITORED CHANNELS (${entries.length})* 〕━━━┈⊷\n`;
+  entries.forEach(([jid, c], idx) => {
+    const state = c.enabled ? '🟢 Active' : '🔴 Paused';
+    const emojis = (c.emojis || []).join(' ') || '❤️';
+    const delay = c.delayStr || `${Math.round((c.delayMs || 5000) / 1000)}s`;
+    const count = c.count === 0 ? 'All Sessions' : `${c.count}x`;
+
+    text += `┃\n`;
+    text += `┃ ${idx + 1}. *${c.name || 'Channel'}* (${state})\n`;
+    text += `┃    🆔 \`${jid}\`\n`;
+    text += `┃    ✨ React: ${emojis} | 🔢 ${count} | ⏳ ${delay}\n`;
+  });
+  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n`;
+  text += `💡 *Commands:* \`.arcdel <jid>\`  |  \`.arcstop <jid|all>\`  |  \`.arcstart <jid|all>\``;
+
+  await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// 3. .arcdel <link|jid> - Delete channel from ARC
+async function arcdelCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner delete kar sakta hai!*" }, { quoted: msg });
+
+  const raw = args[0] || '';
+  if (!raw) return await sock.sendMessage(from, { text: "❌ *Usage:* `.arcdel <channel_link|jid>`" }, { quoted: msg });
+
+  const norm = normalizeChannelInput(raw);
+  const data = loadArcData();
+  let targetJid = norm?.jid;
+
+  if (norm?.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      targetJid = meta.id;
+    } catch {}
+  }
+  if (!targetJid) targetJid = raw;
+
+  if (!data.channels?.[targetJid]) {
+    // Try search by name or partial jid
+    const foundKey = Object.keys(data.channels || {}).find(k => k.includes(targetJid) || (data.channels[k].name && data.channels[k].name.toLowerCase().includes(raw.toLowerCase())));
+    if (foundKey) targetJid = foundKey;
+  }
+
+  if (!data.channels?.[targetJid]) {
+    return await sock.sendMessage(from, { text: `ℹ️ *Channel \`${targetJid}\` ARC list mein nahi mila!*` }, { quoted: msg });
+  }
+
+  const name = data.channels[targetJid].name || targetJid;
+  delete data.channels[targetJid];
+  saveArcData(data);
+
+  await sock.sendMessage(from, {
+    text: `✅ *Channel "${name}" successfully ARC list se delete kar diya gaya!*`
+  }, { quoted: msg });
+}
+
+// 4. .arcstop <link|all> - Stop auto-reaction
+async function arcstopCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner ye command use kar sakta hai!*" }, { quoted: msg });
+
+  const target = (args[0] || '').toLowerCase();
+  const data = loadArcData();
+
+  if (!target || target === 'all') {
+    data.enabled = false;
+    Object.keys(data.channels || {}).forEach(k => { data.channels[k].enabled = false; });
+    saveArcData(data);
+    return await sock.sendMessage(from, {
+      text: "🛑 *ARC STOPPED!* Tamam channels par auto-reaction band kar diya gaya hai."
+    }, { quoted: msg });
+  }
+
+  const norm = normalizeChannelInput(target);
+  let targetJid = norm?.jid || target;
+
+  if (norm?.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      targetJid = meta.id;
+    } catch {}
+  }
+
+  if (data.channels?.[targetJid]) {
+    data.channels[targetJid].enabled = false;
+    saveArcData(data);
+    return await sock.sendMessage(from, {
+      text: `🛑 *Channel "${data.channels[targetJid].name || targetJid}" auto-reaction PAUSE kar diya gaya!*`
+    }, { quoted: msg });
+  }
+
+  return await sock.sendMessage(from, { text: `❌ *Channel \`${targetJid}\` nahi mila!*` }, { quoted: msg });
+}
+
+// 5. .arcstart <link|all> - Resume auto-reaction
+async function arcstartCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner ye command use kar sakta hai!*" }, { quoted: msg });
+
+  const target = (args[0] || '').toLowerCase();
+  const data = loadArcData();
+
+  if (!target || target === 'all') {
+    data.enabled = true;
+    Object.keys(data.channels || {}).forEach(k => { data.channels[k].enabled = true; });
+    saveArcData(data);
+    return await sock.sendMessage(from, {
+      text: "🟢 *ARC RESUMED!* Tamam channels par auto-reaction shuru ho gaya hai."
+    }, { quoted: msg });
+  }
+
+  const norm = normalizeChannelInput(target);
+  let targetJid = norm?.jid || target;
+  if (norm?.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      targetJid = meta.id;
+    } catch {}
+  }
+
+  if (data.channels?.[targetJid]) {
+    data.channels[targetJid].enabled = true;
+    data.enabled = true;
+    saveArcData(data);
+    return await sock.sendMessage(from, {
+      text: `🟢 *Channel "${data.channels[targetJid].name || targetJid}" auto-reaction RESUME ho gaya!*`
+    }, { quoted: msg });
+  }
+
+  return await sock.sendMessage(from, { text: `❌ *Channel \`${targetJid}\` nahi mila!*` }, { quoted: msg });
+}
+
+// 6. .chautojoin / .autojoin / .chjoin - Auto Join Channel Across All Accounts
+async function chautojoinCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner channel auto-join kar sakta hai!*" }, { quoted: msg });
+
+  const rawLink = args[0] || '';
+  if (!rawLink) {
+    return await sock.sendMessage(from, {
+      text: "❌ *Usage:* `.chautojoin <channel_link>`\n_Tamam connected bot accounts se channel ko follow/join karega!_"
+    }, { quoted: msg });
+  }
+
+  const norm = normalizeChannelInput(rawLink);
+  if (!norm) return await sock.sendMessage(from, { text: "❌ *Invalid channel link!*" }, { quoted: msg });
+
+  await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+
+  let targetJid = norm.jid;
+  let channelName = 'WhatsApp Channel';
+  let inviteCode = norm.code || null;
+
+  if (norm.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      targetJid = meta.id;
+      channelName = meta.name || channelName;
+    } catch (e) {
+      return await sock.sendMessage(from, { text: `❌ *Channel resolve nahi hua:* ${e.message}` }, { quoted: msg });
+    }
+  }
+
+  const { uniqueSocks, results } = await joinChannelAcrossAllSessions(sock, targetJid, inviteCode);
+
+  let successCount = 0;
+  let summary = '';
+  results.forEach((r, idx) => {
+    if (r.success) {
+      successCount++;
+      summary += `┃ ${idx + 1}. +${r.account} ➜ ✅ Followed\n`;
+    } else {
+      summary += `┃ ${idx + 1}. +${r.account} ➜ ⚠️ ${r.error || 'Failed'}\n`;
+    }
+  });
+
+  await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
+
+  return await sock.sendMessage(from, {
+    text:
+`╭━━━〔 📢 *CHANNEL AUTO-JOIN COMPLETED* 〕━━━┈⊷
+┃ 🏷️ *Channel:* *${channelName}*
+┃ 🆔 *JID:* \`${targetJid}\`
+┃ 👥 *Total Sessions:* ${uniqueSocks.length}
+┃ ✅ *Successful Joins:* ${successCount}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n
+${summary}\n⚡ *Ab tamam accounts is channel ke active followers hain!*`
+  }, { quoted: msg });
+}
+
+// 7. .arcblock
+async function arcblockCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner ye command use kar sakta hai!*" }, { quoted: msg });
+  const raw = args[0] || '';
+  const norm = normalizeChannelInput(raw);
+  if (!norm) return await sock.sendMessage(from, { text: "❌ *Usage:* `.arcblock <channel_link/jid>`" }, { quoted: msg });
+
+  const data = loadArcData();
+  let jid = norm.jid;
+  if (norm.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      jid = meta.id;
+    } catch {}
+  }
+  if (!jid) return await sock.sendMessage(from, { text: "❌ *Channel resolve nahi ho saka!*" }, { quoted: msg });
+
+  if (!data.blocked) data.blocked = {};
+  data.blocked[jid] = true;
+  if (data.channels?.[jid]) delete data.channels[jid];
+  saveArcData(data);
+
+  await sock.sendMessage(from, { text: `🚫 *Channel block kar diya gaya:* \`${jid}\`` }, { quoted: msg });
+}
+
+// 8. .arcblocklist
+async function arcblocklistCommand(sock, from, msg, isOwner) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner ye command use kar sakta hai!*" }, { quoted: msg });
+  const data = loadArcData();
+  const list = Object.keys(data.blocked || {});
+  if (!list.length) return await sock.sendMessage(from, { text: "ℹ️ *Koi channel blocked nahi hai.*" }, { quoted: msg });
+
+  let text = `╭━━━〔 🚫 *BLOCKED CHANNELS (${list.length})* 〕━━━┈⊷\n`;
+  list.forEach((j, i) => { text += `┃ ${i + 1}. \`${j}\`\n`; });
+  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
+  await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// 9. .arclock
+async function arclockCommand(sock, from, msg, isOwner) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner lock kar sakta hai!*" }, { quoted: msg });
+  const data = loadArcData();
+  data.locked = true;
+  saveArcData(data);
+  await sock.sendMessage(from, { text: "🔒 *ARC settings locked kar di gayin! Ab koi changes nahi kar sakta.*" }, { quoted: msg });
+}
+
+// 10. .arclocklist
+async function arclocklistCommand(sock, from, msg) {
+  const data = loadArcData();
+  await sock.sendMessage(from, {
+    text: `╭━━━〔 🔒 *ARC LOCK STATUS* 〕━━━┈⊷\n┃ 🛡️ *Locked:* ${data.locked ? 'YES (Protected)' : 'NO (Unlocked)'}\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+  }, { quoted: msg });
+}
+
+// 11. .arcprem
+async function arcpremCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner VIP mode set kar sakta hai!*" }, { quoted: msg });
+  const raw = args[0] || '';
+  const norm = normalizeChannelInput(raw);
+  if (!norm) return await sock.sendMessage(from, { text: "❌ *Usage:* `.arcprem <channel_jid/link>`" }, { quoted: msg });
+
+  const data = loadArcData();
+  let jid = norm.jid;
+  if (norm.code) {
+    try {
+      const meta = await sock.newsletterMetadata('invite', norm.code);
+      jid = meta.id;
+    } catch {}
+  }
+  if (!jid) return await sock.sendMessage(from, { text: "❌ *Channel resolve nahi hua!*" }, { quoted: msg });
+
+  if (!data.channels) data.channels = {};
+  if (!data.channels[jid]) {
+    data.channels[jid] = { jid, emojis: ['🔥', '❤️'], count: 0, delayMs: 2000, enabled: true, premium: true, addedAt: Date.now() };
+  } else {
+    data.channels[jid].premium = true;
+    data.channels[jid].delayMs = 2000;
+  }
+  saveArcData(data);
+
+  await sock.sendMessage(from, { text: `⭐ *Channel VIP / Premium ARC mein set ho gaya:* \`${jid}\`` }, { quoted: msg });
+}
+
+// 12. .arcpremiumlist
+async function arcpremiumlistCommand(sock, from, msg) {
+  const data = loadArcData();
+  const prems = Object.entries(data.channels || {}).filter(([_, c]) => c.premium);
+  if (!prems.length) return await sock.sendMessage(from, { text: "ℹ️ *Koi VIP / Premium channel set nahi hai.*" }, { quoted: msg });
+
+  let text = `╭━━━〔 ⭐ *VIP ARC CHANNELS (${prems.length})* 〕━━━┈⊷\n`;
+  prems.forEach(([j, c], i) => {
+    text += `┃ ${i + 1}. \`${j}\` ➜ ${(c.emojis || ['🔥']).join(' ')}\n`;
+  });
+  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
+  await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// 13. .arcremoveall
+async function arcremoveallCommand(sock, from, msg, isOwner) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner clear kar sakta hai!*" }, { quoted: msg });
+  const data = loadArcData();
+  const count = Object.keys(data.channels || {}).length;
+  data.channels = {};
+  saveArcData(data);
+  await sock.sendMessage(from, { text: `🗑️ *Tamam (${count}) ARC channels remove kar diye gaye!*` }, { quoted: msg });
+}
+
+// 14. .arcunblock
+async function arcunblockCommand(sock, from, msg, isOwner, args = []) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner unblock kar sakta hai!*" }, { quoted: msg });
+  const raw = args[0] || '';
+  const norm = normalizeChannelInput(raw);
+  if (!norm) return await sock.sendMessage(from, { text: "❌ *Usage:* `.arcunblock <channel_jid/link>`" }, { quoted: msg });
+
+  const data = loadArcData();
+  let jid = norm.jid || (norm.code ? `${norm.code}@newsletter` : raw);
+  if (data.blocked?.[jid]) {
+    delete data.blocked[jid];
+    saveArcData(data);
+    return await sock.sendMessage(from, { text: `✅ *Channel unblock kar diya gaya:* \`${jid}\`` }, { quoted: msg });
+  }
+  await sock.sendMessage(from, { text: `ℹ️ *Channel blocked list mein nahi tha.*` }, { quoted: msg });
+}
+
+// 15. .arcunlock
+async function arcunlockCommand(sock, from, msg, isOwner) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner unlock kar sakta hai!*" }, { quoted: msg });
+  const data = loadArcData();
+  data.locked = false;
+  saveArcData(data);
+  await sock.sendMessage(from, { text: "🔓 *ARC settings UNLOCKED! Ab modifications allow hain.*" }, { quoted: msg });
+}
+
+// 16. .chreactall - React to multiple recent posts in a channel
+async function chreactallCommand(sock, from, msg, args = []) {
+  if (!args[0]) {
+    return await sock.sendMessage(from, { text: "❌ *Usage:* `.chreactall <channel_link> [emoji]`" }, { quoted: msg });
+  }
+
+  const rawLink = args[0];
+  const emoji = args[1] || '🔥';
+
+  try {
+    const target = await hub.resolveTarget(sock, rawLink);
+    if (!target?.jid) {
+      return await sock.sendMessage(from, { text: "❌ *Channel link resolve nahi ho saka!*" }, { quoted: msg });
+    }
+
+    await sock.sendMessage(from, {
+      text: `⏳ *Channel ${target.channelName || target.jid} ke recent posts par multi-session reaction lagaya ja raha hai...*`
+    }, { quoted: msg });
+
+    const recent = await hub.fetchRecent(sock, target.jid, 5).catch(() => []);
+    if (!recent || !recent.length) {
+      return await sock.sendMessage(from, { text: "❌ *Channel ke recent messages nahi mile!*" }, { quoted: msg });
+    }
+
+    let reacted = 0;
+    for (const post of recent) {
+      if (post.serverId) {
+        await executeMultiSessionReaction(sock, from, msg, {
+          jid: target.jid,
+          serverId: String(post.serverId),
+          channelName: target.channelName
+        }, emoji).catch(() => {});
+        reacted++;
+        await new Promise(r => setTimeout(r, 1200));
+      }
+    }
+
+    await sock.sendMessage(from, {
+      text: `✅ *Tamam ${reacted} posts par '${emoji}' react complete ho gaya!*`
+    }, { quoted: msg });
+
+  } catch (e) {
+    await sock.sendMessage(from, { text: `❌ *Error:* ${e.message}` }, { quoted: msg });
+  }
+}
+
+// 17. .chunreact - Remove reaction from channel post
+async function chunreactCommand(sock, from, msg, args = []) {
+  if (!args[0]) {
+    return await sock.sendMessage(from, { text: "❌ *Usage:* `.chunreact <channel_post_link>`" }, { quoted: msg });
+  }
+
+  try {
+    const target = await hub.resolveTarget(sock, args[0]);
+    if (!target?.jid || !target?.serverId) {
+      return await sock.sendMessage(from, { text: "❌ *Valid channel post link provide karein!*" }, { quoted: msg });
+    }
+
+    await executeMultiSessionReaction(sock, from, msg, target, '');
+  } catch (e) {
+    await sock.sendMessage(from, { text: `❌ *Error:* ${e.message}` }, { quoted: msg });
+  }
+}
+
+// 18. .pollrand - Cast random vote on quoted poll
+async function pollrandCommand(sock, from, msg) {
+  const quoted = extractQuotedPoll(msg);
+  if (!quoted) {
+    return await sock.sendMessage(from, { text: "❌ *Kisi Poll ko reply karke `.pollrand` likhein!*" }, { quoted: msg });
+  }
+
+  const optCount = quoted.options?.length || 2;
+  const randomChoice = Math.floor(Math.random() * optCount);
+  const chosenName = quoted.options[randomChoice] || `Option ${randomChoice + 1}`;
+
+  if (quoted.isChannel) {
+    return await executeMultiSessionChannelPollVote(sock, from, msg, {
+      jid: quoted.newsletterJid,
+      serverId: quoted.serverMessageId,
+      channelName: quoted.channelName || 'Channel Poll',
+      pollInfo: quoted
+    }, randomChoice);
+  }
+
+  const { voteChatPoll } = require('./chreact');
+  if (typeof voteChatPoll === 'function') {
+    return await voteChatPoll(sock, from, msg, quoted, randomChoice);
+  }
+
+  await sock.sendMessage(from, { text: `🎲 *Random Vote selected:* *${chosenName}*` }, { quoted: msg });
+}
+
+// 19. .pollunvote - Remove vote from poll
+async function pollunvoteCommand(sock, from, msg) {
+  const quoted = extractQuotedPoll(msg);
+  if (!quoted) {
+    return await sock.sendMessage(from, { text: "❌ *Kisi Poll ko reply karke `.pollunvote` likhein!*" }, { quoted: msg });
+  }
+
+  if (quoted.isChannel) {
+    const uniqueSocks = getActiveSockets(sock);
+    for (const s of uniqueSocks) {
+      try {
+        const messageId = typeof s.generateMessageTag === 'function' ? s.generateMessageTag() : `${Date.now()}`;
+        await s.query({
+          tag: 'message',
+          attrs: {
+            to: quoted.newsletterJid,
+            id: messageId,
+            type: 'poll',
+            server_id: String(quoted.serverMessageId)
+          },
+          content: [
+            { tag: 'meta', attrs: { polltype: 'vote' } },
+            { tag: 'votes', attrs: {}, content: [] }
+          ]
+        });
+      } catch {}
+    }
+    return await sock.sendMessage(from, { text: "✅ *Channel poll se vote remove kar diya gaya!*" }, { quoted: msg });
+  }
+
+  await sock.sendMessage(from, { text: "ℹ️ *Chat poll se unvote karne ke liye poll par dobara tap karein.*" }, { quoted: msg });
+}
+
+// 20. .pollvfix - Fix and repair poll keys
+async function pollvfixCommand(sock, from, msg) {
+  const pollStore = require('../utils/pollStore');
+  const count = pollStore?.clearAll ? pollStore.clearAll() : 0;
+  await sock.sendMessage(from, {
+    text: `🔧 *Poll keys and cache have been refreshed! Total cleaned records:* ${count || 'Done'}`
+  }, { quoted: msg });
+}
+
+// 21. .pollvinfo - Inspect poll question, options, voter count
+async function pollvinfoCommand(sock, from, msg) {
+  const quoted = extractQuotedPoll(msg);
+  if (!quoted) {
+    return await sock.sendMessage(from, { text: "❌ *Kisi Poll ko reply karke `.pollvinfo` likhein!*" }, { quoted: msg });
+  }
+
+  let text =
+`╭━━━〔 📊 *POLL INFORMATION* 〕━━━┈⊷
+┃ ❓ *Question:* *${quoted.name}*
+┃ 📺 *Type:* ${quoted.isChannel ? '📢 Channel Poll' : '💬 Chat Poll'}
+┃ 🔢 *Options Count:* ${quoted.options.length}
+`;
+  quoted.options.forEach((opt, idx) => {
+    text += `┃    ${idx + 1}. *${opt}*\n`;
+  });
+  if (quoted.serverMessageId) text += `┃ 🆔 *Server ID:* \`${quoted.serverMessageId}\`\n`;
+  if (quoted.newsletterJid) text += `┃ 📢 *Channel:* \`${quoted.newsletterJid}\`\n`;
+  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
+
+  await sock.sendMessage(from, { text }, { quoted: msg });
+}
+
+// 22. .pollvote - General poll voting
+async function pollvoteCommand(sock, from, msg, args = []) {
+  const quoted = extractQuotedPoll(msg);
+  if (!quoted) {
+    return await sock.sendMessage(from, { text: "❌ *Jis poll par vote karna hai use reply karein:*\n👉 `.pollvote 1` ya `.pollvote OptionName`" }, { quoted: msg });
+  }
+
+  const optionArg = args.join(' ').trim() || '1';
+
+  if (quoted.isChannel) {
+    return await executeMultiSessionChannelPollVote(sock, from, msg, {
+      jid: quoted.newsletterJid,
+      serverId: quoted.serverMessageId,
+      channelName: quoted.channelName || 'Channel Poll',
+      pollInfo: quoted
+    }, optionArg);
+  }
+
+  const { voteChatPoll } = require('./chreact');
+  if (typeof voteChatPoll === 'function') {
+    return await voteChatPoll(sock, from, msg, quoted, optionArg);
+  }
+
+  await sock.sendMessage(from, { text: "❌ *Chat poll vote handler unavailable.*" }, { quoted: msg });
+}
+
+// 23. .pollvstop - Stop poll booster
+async function pollvstopCommand(sock, from, msg, isOwner) {
+  if (!isOwner) return await sock.sendMessage(from, { text: "❌ *Sirf Bot Owner stop kar sakta hai!*" }, { quoted: msg });
+  globalThis.pollVotingCancelled = true;
+  await sock.sendMessage(from, { text: "🛑 *Poll vote boosting process stopped!*" }, { quoted: msg });
+}
+
+module.exports = {
+  loadArcData,
+  saveArcData,
+  arcCommand,
+  arclistCommand,
+  arcdelCommand,
+  arcstopCommand,
+  arcstartCommand,
+  chautojoinCommand,
+  arcblockCommand,
+  arcblocklistCommand,
+  arclockCommand,
+  arclocklistCommand,
+  arcpremCommand,
+  arcpremiumlistCommand,
+  arcremoveallCommand,
+  arcunblockCommand,
+  arcunlockCommand,
+  chreactallCommand,
+  chunreactCommand,
+  pollrandCommand,
+  pollunvoteCommand,
+  pollvfixCommand,
+  pollvinfoCommand,
+  pollvoteCommand,
+  pollvstopCommand,
+  executeArcAutoReaction
+};

@@ -1,0 +1,862 @@
+'use strict';
+
+/**
+ * ProBoy-MD / MR SAQIB MD :: Channel Reaction & Authentic WhatsApp Poll Voting Automation
+ * ============================================================================
+ * .chreact <post link> [emoji]
+ *   Reacts with emoji to any WhatsApp Channel post from ALL connected bot sessions!
+ *
+ * .vote1 / .vote2 / .vote3 / .vote4
+ *   - WhatsApp Channel Polls: Casts authentic votes on Option 1/2/3/4 on the channel poll!
+ *   - WhatsApp Chat Polls: Casts encrypted authentic votes on Option 1/2/3/4 in group/chat!
+ *
+ * .chvote / .vote <option>
+ *   General voting command supporting both WhatsApp Channel Polls and Chat Polls!
+ * ============================================================================
+ */
+
+const crypto = require('crypto');
+const { proto, jidNormalizedUser } = require('@whiskeysockets/baileys');
+const { hmacSign, sha256, aesEncryptGCM } = require('@whiskeysockets/baileys/lib/Utils/crypto');
+const config = require('../config');
+const hub = require('../utils/channelHub');
+const pollStore = require('../utils/pollStore');
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const VOTE_EMOJI_MAP = {
+  '1': '1️⃣',
+  '2': '2️⃣',
+  '3': '3️⃣',
+  '4': '4️⃣',
+  '5': '5️⃣',
+  'thumb': '👍',
+  'like': '👍',
+  'love': '❤️',
+  'heart': '❤️',
+  'fire': '🔥',
+  'laugh': '😂',
+  'lol': '😂',
+  'clap': '👏'
+};
+
+/**
+ * Encrypts a chat poll vote according to WhatsApp's Signal/GCM protocol
+ */
+function encryptPollVote(selectedOptions, { pollCreatorJid, pollMsgId, pollEncKey, voterJid }) {
+  const sign = Buffer.concat([
+    Buffer.from(pollMsgId),
+    Buffer.from(pollCreatorJid),
+    Buffer.from(voterJid),
+    Buffer.from('Poll Vote'),
+    new Uint8Array([1])
+  ]);
+  const key0 = hmacSign(pollEncKey, new Uint8Array(32), 'sha256');
+  const decKey = hmacSign(sign, key0, 'sha256');
+  const aad = Buffer.from(pollMsgId + '\u0000' + voterJid);
+
+  const pollVoteMessage = proto.Message.PollVoteMessage.encode({
+    selectedOptions: selectedOptions.map(opt => Buffer.isBuffer(opt) ? opt : Buffer.from(opt))
+  }).finish();
+
+  const encIv = crypto.randomBytes(12);
+  const encPayload = aesEncryptGCM(pollVoteMessage, decKey, encIv, aad);
+
+  return { encPayload, encIv };
+}
+
+/**
+ * Checks if message is quoting a WhatsApp Chat Poll
+ */
+function extractQuotedPoll(msg) {
+  const mContent = msg?.message?.ephemeralMessage?.message 
+    || msg?.message?.viewOnceMessage?.message 
+    || msg?.message?.viewOnceMessageV2?.message 
+    || msg?.message?.documentWithCaptionMessage?.message 
+    || msg?.message;
+
+  const ctx = mContent?.extendedTextMessage?.contextInfo 
+    || mContent?.imageMessage?.contextInfo 
+    || mContent?.videoMessage?.contextInfo 
+    || msg?.message?.extendedTextMessage?.contextInfo
+    || msg?.message?.contextInfo;
+
+  if (!ctx) return null;
+
+  const stanzaId = ctx.stanzaId;
+  const participant = ctx.participant || ctx.remoteJid;
+  
+  const rawQuoted = ctx.quotedMessage;
+  const quoted = rawQuoted?.ephemeralMessage?.message 
+    || rawQuoted?.viewOnceMessage?.message 
+    || rawQuoted?.viewOnceMessageV2?.message 
+    || rawQuoted;
+
+  if (!quoted) return null;
+
+  const poll = quoted.pollCreationMessage 
+    || quoted.pollCreationMessageV2 
+    || quoted.pollCreationMessageV3
+    || quoted.pollCreationMessageV4
+    || quoted.pollCreationMessageV5;
+
+  if (!poll) return null;
+
+  const options = (poll.options || []).map(o => typeof o === 'string' ? o : (o.optionName || ''));
+
+  let secret = quoted.messageContextInfo?.messageSecret 
+    || rawQuoted?.messageContextInfo?.messageSecret
+    || ctx.quotedMessage?.messageContextInfo?.messageSecret
+    || mContent?.messageContextInfo?.messageSecret
+    || msg?.message?.messageContextInfo?.messageSecret;
+
+  if (!secret && stanzaId) {
+    const stored = pollStore.getPoll(stanzaId);
+    if (stored?.secret) secret = stored.secret;
+  }
+
+  // Check if this quoted poll is from a newsletter channel
+  let newsletterJid = ctx?.forwardedNewsletterMessageInfo?.newsletterJid || null;
+  let serverMessageId = ctx?.forwardedNewsletterMessageInfo?.serverMessageId || null;
+  let channelName = ctx?.forwardedNewsletterMessageInfo?.newsletterName || null;
+
+  return {
+    stanzaId,
+    participant,
+    poll,
+    name: poll.name || 'Poll',
+    options,
+    secret: secret ? (Buffer.isBuffer(secret) ? secret : Buffer.from(secret)) : null,
+    isChannel: Boolean(newsletterJid),
+    newsletterJid,
+    serverMessageId: serverMessageId ? String(serverMessageId) : null,
+    channelName
+  };
+}
+
+/**
+ * Attempts to fetch poll details for a WhatsApp Channel post
+ */
+async function fetchChannelPollDetails(sock, jid, serverId) {
+  serverId = String(serverId);
+  // Check pollStore first
+  const stored = pollStore.getPoll(serverId, jid);
+  if (stored && stored.options && stored.options.length) {
+    return {
+      name: stored.name || 'Channel Poll',
+      options: stored.options
+    };
+  }
+
+  // Try fetching recent messages via channelHub or Baileys
+  try {
+    if (typeof hub.fetchRecent === 'function') {
+      const recent = await hub.fetchRecent(sock, jid, 25).catch(() => []);
+      for (const entry of (recent || [])) {
+        if (String(entry.serverId) === serverId && entry.message) {
+          const poll = entry.message.pollCreationMessage 
+            || entry.message.pollCreationMessageV2 
+            || entry.message.pollCreationMessageV3
+            || entry.message.pollCreationMessageV4
+            || entry.message.pollCreationMessageV5;
+          if (poll) {
+            const options = (poll.options || []).map(o => typeof o === 'string' ? o : (o.optionName || ''));
+            const res = { name: poll.name || 'Channel Poll', options };
+            pollStore.registerPoll(serverId, { remoteJid: jid, serverId, ...res });
+            return res;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.log('[PollDebug] FetchChannelPoll error:', err.message);
+  }
+
+  return null;
+}
+
+/**
+ * Robustly retrieves all connected, active bot sockets
+ */
+function getActiveSockets(primarySock) {
+  let activeSocks = [];
+  try {
+    if (typeof globalThis.ProBoySessionManager?.getActiveSocks === 'function') {
+      activeSocks = globalThis.ProBoySessionManager.getActiveSocks();
+    }
+  } catch {}
+
+  const seen = new Set();
+  const result = [];
+
+  const checkAndAdd = (s) => {
+    if (!s) return;
+    const acct = hub.accountOf(s);
+    if (!acct) return;
+    if (seen.has(acct)) return;
+    const isUp = Boolean(hub.isOpen(s) || s.ws?.isOpen || s.ws?.readyState === 1 || s.user?.id);
+    if (isUp) {
+      seen.add(acct);
+      result.push(s);
+    }
+  };
+
+  if (primarySock) checkAndAdd(primarySock);
+  for (const s of activeSocks) {
+    checkAndAdd(s);
+  }
+
+  if (!result.length && primarySock) result.push(primarySock);
+  return result;
+}
+
+/**
+ * Executes authentic WhatsApp Channel Poll vote across ALL connected bot sessions
+ */
+async function executeMultiSessionChannelPollVote(sock, from, msg, target, optionIndexOrName = 0) {
+  const { jid, serverId, channelName } = target;
+
+  // Gather active connected bot sockets
+  const uniqueSocks = getActiveSockets(sock);
+
+  // Resolve poll details
+  let pollName = 'Channel Poll';
+  let optionsList = [];
+  let selectedOptionName = null;
+
+  if (target.pollInfo) {
+    pollName = target.pollInfo.name || pollName;
+    optionsList = target.pollInfo.options || [];
+  } else {
+    const details = await fetchChannelPollDetails(sock, jid, serverId);
+    if (details) {
+      pollName = details.name || pollName;
+      optionsList = details.options || [];
+    }
+  }
+
+  // Resolve option name
+  if (typeof optionIndexOrName === 'number') {
+    if (optionsList.length > 0 && optionIndexOrName >= 0 && optionIndexOrName < optionsList.length) {
+      selectedOptionName = optionsList[optionIndexOrName];
+    }
+  } else if (typeof optionIndexOrName === 'string') {
+    const trimmed = optionIndexOrName.trim();
+    if (/^[0-9]+$/.test(trimmed)) {
+      const idx = parseInt(trimmed, 10) - 1;
+      if (optionsList.length > 0 && idx >= 0 && idx < optionsList.length) {
+        selectedOptionName = optionsList[idx];
+      }
+    } else if (trimmed) {
+      selectedOptionName = trimmed;
+    }
+  }
+
+  // Default fallback if name could not be resolved from poll options
+  if (!selectedOptionName) {
+    const optIdx = typeof optionIndexOrName === 'number' ? optionIndexOrName : (parseInt(optionIndexOrName, 10) - 1 || 0);
+    if (optionsList[optIdx]) {
+      selectedOptionName = optionsList[optIdx];
+    } else {
+      selectedOptionName = `Option ${optIdx + 1}`;
+    }
+  }
+
+  // Notification before voting
+  await sock.sendMessage(from, {
+    text: `⚡ *WHATSAPP CHANNEL POLL VOTE BOOST*\n\n` +
+          `📢 *Channel:* *${channelName}*\n` +
+          `📌 *Post ID:* \`${serverId}\`\n` +
+          `🗳️ *Selected Option:* *${selectedOptionName}*\n` +
+          `📱 *Connected Sessions:* ${uniqueSocks.length}\n\n` +
+          `⏳ Tamam connected bot accounts se channel poll par real vote cast kiya ja raha hai...`
+  }, { quoted: msg }).catch(() => {});
+
+  // Compute option hash Buffer
+  const optHash = crypto.createHash('sha256').update(String(selectedOptionName), 'utf8').digest();
+  const votesNode = [
+    {
+      tag: 'vote',
+      attrs: {},
+      content: optHash
+    }
+  ];
+
+  let success = 0;
+  let failed = 0;
+  const details = [];
+
+  for (let i = 0; i < uniqueSocks.length; i++) {
+    const s = uniqueSocks[i];
+    const acct = hub.accountOf(s) || `Session ${i + 1}`;
+
+    try {
+      // 1. Ensure this session follows the channel
+      if (typeof s.newsletterFollow === 'function') {
+        await s.newsletterFollow(jid).catch(() => {});
+      }
+
+      // 2. Subscribe to live newsletter updates so WhatsApp server registers this client as an active viewer
+      if (typeof s.subscribeNewsletterUpdates === 'function') {
+        await s.subscribeNewsletterUpdates(jid).catch(() => {});
+      }
+
+      // 3. Fetch latest channel message to simulate client viewing the channel before voting
+      if (typeof s.newsletterFetchMessages === 'function') {
+        await s.newsletterFetchMessages(jid, 1).catch(() => {});
+      }
+
+      await sleep(300);
+
+      // 4. Send official channel poll vote
+      const messageId = typeof s.generateMessageTag === 'function' ? s.generateMessageTag() : `${Date.now()}`;
+      await s.query({
+        tag: 'message',
+        attrs: {
+          to: jid,
+          id: messageId,
+          type: 'poll',
+          server_id: String(serverId)
+        },
+        content: [
+          { tag: 'meta', attrs: { polltype: 'vote' } },
+          { tag: 'votes', attrs: {}, content: votesNode }
+        ]
+      });
+
+      success++;
+      details.push(`• +${acct}: ✅ Voted (${selectedOptionName})`);
+      console.log(`[ChannelPollVote] ✅ Session +${acct} successfully voted on channel ${jid} post ${serverId}`);
+    } catch (err) {
+      failed++;
+      const errMsg = String(err?.message || err);
+      details.push(`• +${acct}: ❌ ${errMsg.slice(0, 40)}`);
+      console.error(`[ChannelPollVote] ❌ Session +${acct} vote failed:`, err);
+    }
+
+    if (i < uniqueSocks.length - 1) {
+      await sleep(1000);
+    }
+  }
+
+  const summaryText =
+    `╭━━━〔 ⚡ *WHATSAPP CHANNEL POLL VOTE BOOST* 〕━━━┈⊷\n` +
+    `┃ 📢 *Channel:* *${channelName}*\n` +
+    `┃ 🆔 *JID:* \`${jid}\`\n` +
+    `┃ 📌 *Post ID:* \`${serverId}\`\n` +
+    `┃ 📊 *Poll Question:* *${pollName}*\n` +
+    `┃ 🗳️ *Voted Option:* *${selectedOptionName}*\n` +
+    `┃ 📱 *Total Sessions:* ${uniqueSocks.length}\n` +
+    `┃ ✅ *Successful Votes:* ${success}\n` +
+    `┃ ❌ *Failed:* ${failed}\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+    `📋 *Session Breakdown:*\n` +
+    details.join('\n') +
+    `\n\n🚀 *Powered by MR SAQIB MD*`;
+
+  await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
+}
+
+/**
+ * Executes real WhatsApp In-Chat Poll vote across ALL connected bot sessions
+ */
+async function executeMultiSessionPollVote(sock, from, msg, quotedPoll, optionIndex = 0) {
+  const { stanzaId, participant, name, options, secret } = quotedPoll;
+
+  if (optionIndex < 0 || optionIndex >= options.length) {
+    return sock.sendMessage(from, {
+      text: `❌ *Invalid Option!*\n\nIs poll mein sirf *${options.length}* options hain:\n` +
+            options.map((opt, i) => `${i + 1}. *${opt}*`).join('\n')
+    }, { quoted: msg });
+  }
+
+  const selectedOptionName = options[optionIndex];
+  const optHash = sha256(Buffer.from(selectedOptionName));
+
+  // Gather all active connected bot sessions
+  const uniqueSocks = getActiveSockets(sock);
+
+  // If secret key is not available
+  if (!secret) {
+    console.log('[PollDebug] ⚠️ Poll Secret missing for stanzaId:', stanzaId);
+    return sock.sendMessage(from, {
+      text: 
+`╭━━━〔 ⚡ *WHATSAPP POLL VOTE* 〕━━━┈⊷
+┃ ⚠️ *Poll Secret Key Missing!*
+┃
+┃ Ye poll bot ke restart ya connect hone se pehle ka hai,
+┃ is liye WhatsApp end-to-end secret key save nahi thi.
+┃
+┃ 👉 *Naye poll par reply kar ke .vote1 ya .vote2 karein,*
+┃ *tamam connected bot sessions se instant real vote lag jayega!*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+    }, { quoted: msg });
+  }
+
+  const isGroup = from.endsWith('@g.us');
+  const pollCreatorJid = participant ? jidNormalizedUser(participant) : jidNormalizedUser(from);
+
+  let success = 0;
+  let failed = 0;
+  const details = [];
+
+  for (let i = 0; i < uniqueSocks.length; i++) {
+    const s = uniqueSocks[i];
+    const acct = hub.accountOf(s) || `Session ${i + 1}`;
+    const voterJid = s.user?.id ? jidNormalizedUser(s.user.id) : null;
+
+    if (!voterJid) {
+      failed++;
+      continue;
+    }
+
+    try {
+      const { encPayload, encIv } = encryptPollVote([optHash], {
+        pollCreatorJid,
+        pollMsgId: stanzaId,
+        pollEncKey: secret,
+        voterJid
+      });
+
+      const pollUpdateMessage = {
+        pollCreationMessageKey: {
+          remoteJid: from,
+          fromMe: false,
+          id: stanzaId,
+          ...(isGroup ? { participant: pollCreatorJid } : {})
+        },
+        vote: {
+          encPayload,
+          encIv
+        },
+        senderTimestampMs: Date.now()
+      };
+
+      await s.relayMessage(from, { pollUpdateMessage }, {
+        additionalNodes: [
+          {
+            tag: 'meta',
+            attrs: {
+              polltype: 'vote'
+            }
+          }
+        ]
+      });
+
+      success++;
+      details.push(`• +${acct}: ✅ Voted (${selectedOptionName})`);
+      console.log(`[PollVote] ✅ Session +${acct} successfully voted on poll ${stanzaId}`);
+    } catch (err) {
+      failed++;
+      details.push(`• +${acct}: ❌ ${err.message?.slice(0, 35)}`);
+      console.error(`[PollVote] ❌ Session +${acct} vote failed:`, err);
+    }
+
+    if (i < uniqueSocks.length - 1) {
+      await sleep(250);
+    }
+  }
+
+  const summaryText =
+`╭━━━〔 ⚡ *WHATSAPP POLL VOTE BOOST* 〕━━━┈⊷
+┃ 📊 *Poll Question:* *${name}*
+┃ 🎯 *Selected Option:* *${selectedOptionName}* (Option ${optionIndex + 1})
+┃ 📱 *Total Sessions:* ${uniqueSocks.length}
+┃ ✅ *Successful Votes:* ${success}
+┃ ❌ *Failed:* ${failed}
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
+
+📋 *Session Votes:*
+${details.join('\n')}
+
+🚀 *Powered by MR SAQIB MD*`;
+
+  await sock.sendMessage(from, { text: summaryText }, { quoted: msg });
+}
+
+/**
+ * Extracts channel target, post server_id, and custom token from args or quoted message
+ */
+function parseTargetAndEmoji(args, msg, defaultEmoji = '❤️') {
+  let rawText = (args || []).join(' ').trim();
+  let code = null;
+  let jid = null;
+  let serverId = null;
+  let customEmoji = null;
+  let customOptionText = null;
+  let channelName = 'WhatsApp Channel';
+  let pollInfo = null;
+
+  // 1. Check for Channel post URL in args: https://whatsapp.com/channel/CODE/POST_ID
+  const urlMatch = rawText.match(/https?:\/\/(?:www\.)?whatsapp\.com\/channel\/([A-Za-z0-9_-]{8,})(?:\/([0-9]+))?/i);
+  if (urlMatch) {
+    code = urlMatch[1];
+    if (urlMatch[2]) serverId = urlMatch[2];
+    rawText = rawText.replace(urlMatch[0], '').trim();
+  }
+
+  // 2. Check for Newsletter JID in args if no URL: 120363421389121979@newsletter[/POST_ID]
+  if (!code) {
+    const jidMatch = rawText.match(/([0-9]{10,}@newsletter)(?:[\s/]+([0-9]+))?/i);
+    if (jidMatch) {
+      jid = jidMatch[1];
+      if (jidMatch[2]) serverId = jidMatch[2];
+      rawText = rawText.replace(jidMatch[0], '').trim();
+    }
+  }
+
+  // 3. Check for serverId if not found yet
+  if (!serverId && rawText) {
+    const idMatch = rawText.match(/\b([0-9]{1,10})\b/);
+    if (idMatch) {
+      serverId = idMatch[1];
+      rawText = rawText.replace(idMatch[0], '').trim();
+    }
+  }
+
+  // 4. Check for emoji or option text in remaining text
+  if (rawText) {
+    const emojiMatch = rawText.match(/(\p{Extended_Pictographic}|[\u2000-\u3300])/u);
+    if (emojiMatch) {
+      customEmoji = emojiMatch[0];
+    } else {
+      customOptionText = rawText;
+      const token = rawText.split(/\s+/)[0]?.trim().toLowerCase();
+      if (token) {
+        customEmoji = VOTE_EMOJI_MAP[token] || token;
+      }
+    }
+  }
+
+  // 5. Inspect msg / quoted context if code/jid or serverId is missing
+  const mContent = msg?.message?.ephemeralMessage?.message || msg?.message;
+  const ctx = mContent?.extendedTextMessage?.contextInfo || msg?.message?.extendedTextMessage?.contextInfo;
+  const qMsg = ctx?.quotedMessage;
+
+  // Check forwardedNewsletterMessageInfo
+  let fnmi = ctx?.forwardedNewsletterMessageInfo;
+  if (!fnmi && qMsg) {
+    for (const k of Object.keys(qMsg)) {
+      if (qMsg[k]?.contextInfo?.forwardedNewsletterMessageInfo) {
+        fnmi = qMsg[k].contextInfo.forwardedNewsletterMessageInfo;
+        break;
+      }
+    }
+  }
+
+  if (fnmi && fnmi.newsletterJid && fnmi.serverMessageId) {
+    if (!jid && !code) jid = fnmi.newsletterJid;
+    if (!serverId) serverId = String(fnmi.serverMessageId);
+    if (fnmi.newsletterName) channelName = fnmi.newsletterName;
+  }
+
+  // If quoted message is a poll
+  if (qMsg) {
+    const qPoll = qMsg.pollCreationMessage || qMsg.pollCreationMessageV2 || qMsg.pollCreationMessageV3;
+    if (qPoll) {
+      pollInfo = {
+        name: qPoll.name || 'Poll',
+        options: (qPoll.options || []).map(o => typeof o === 'string' ? o : (o.optionName || ''))
+      };
+    }
+  }
+
+  // Check quoted message text for a channel URL
+  if ((!code && !jid) || !serverId) {
+    const quotedText = qMsg?.conversation ||
+      qMsg?.extendedTextMessage?.text ||
+      qMsg?.imageMessage?.caption ||
+      qMsg?.videoMessage?.caption || '';
+
+    if (quotedText) {
+      const qUrlMatch = quotedText.match(/https?:\/\/(?:www\.)?whatsapp\.com\/channel\/([A-Za-z0-9_-]{8,})(?:\/([0-9]+))?/i);
+      if (qUrlMatch) {
+        if (!code && !jid) code = qUrlMatch[1];
+        if (!serverId && qUrlMatch[2]) serverId = qUrlMatch[2];
+      }
+    }
+  }
+
+  const emoji = customEmoji || defaultEmoji;
+  return { code, jid, serverId, emoji, customOptionText, channelName, pollInfo };
+}
+
+/**
+ * Resolves invite code to JID and channel metadata
+ */
+async function resolveChannelPost(sock, parsed) {
+  let { code, jid, serverId, emoji, customOptionText, channelName, pollInfo } = parsed;
+
+  if (code && !jid) {
+    try {
+      const res = await hub.resolveInvite(sock, code);
+      if (res && res.rec) {
+        jid = res.rec.jid;
+        channelName = res.rec.name || channelName;
+      }
+    } catch (e) {
+      return { ok: false, error: `Channel invite link resolve nahi ho saka: ${e.message}` };
+    }
+  }
+
+  if (!jid) {
+    return { ok: false, error: 'Channel link ya JID nahi mila! Barah-e-karam channel post ka link dein ya Poll par reply karein.' };
+  }
+
+  if (!serverId) {
+    return {
+      ok: false,
+      error: 'Post ID nahi mili! Link me post ID honi chahiye jaise:\n👉 `https://whatsapp.com/channel/CODE/123`\nYa channel post par reply kar ke command dein!'
+    };
+  }
+
+  if (channelName === 'WhatsApp Channel') {
+    try {
+      const meta = await sock.newsletterMetadata('jid', jid);
+      const parsedMeta = hub.parseMeta(meta);
+      if (parsedMeta?.name) channelName = parsedMeta.name;
+    } catch {}
+  }
+
+  return { ok: true, jid, serverId: String(serverId), emoji, customOptionText, channelName, pollInfo };
+}
+
+/**
+ * Executes emoji reaction across ALL connected bot sessions
+ */
+async function executeMultiSessionReaction(sock, from, msg, target, title = 'CHANNEL REACTION BOOST') {
+  const { jid, serverId, emoji, channelName } = target;
+
+  let activeSocks = [];
+  try {
+    activeSocks = globalThis.ProBoySessionManager?.getActiveSocks?.() || [];
+  } catch {}
+
+  const seen = new Set();
+  const uniqueSocks = [];
+
+  for (const s of [sock, ...activeSocks]) {
+    const acct = hub.accountOf(s);
+    if (acct && !seen.has(acct) && hub.isOpen(s)) {
+      seen.add(acct);
+      uniqueSocks.push(s);
+    }
+  }
+
+  if (!uniqueSocks.length) {
+    uniqueSocks.push(sock);
+  }
+
+  await sock.sendMessage(from, {
+    text: `⚡ *${title} STARTING*\n\n` +
+          `📢 *Channel:* *${channelName}*\n` +
+          `📌 *Post ID:* \`${serverId}\`\n` +
+          `💖 *Reaction Emoji:* ${emoji}\n` +
+          `📱 *Connected Sessions:* ${uniqueSocks.length}\n\n` +
+          `⏳ Tamam connected bot users ki taraf se react kiya ja raha hai...`
+  }, { quoted: msg }).catch(() => {});
+
+  let success = 0;
+  let failed = 0;
+  const details = [];
+
+  for (let i = 0; i < uniqueSocks.length; i++) {
+    const s = uniqueSocks[i];
+    const acct = hub.accountOf(s) || `Session ${i + 1}`;
+
+    try {
+      if (typeof s.newsletterFollow === 'function') {
+        await s.newsletterFollow(jid).catch(() => {});
+      }
+
+      if (typeof s.newsletterReactMessage === 'function') {
+        await s.newsletterReactMessage(jid, serverId, emoji);
+        success++;
+        details.push(`• +${acct}: ✅ Reacted (${emoji})`);
+      } else {
+        failed++;
+        details.push(`• +${acct}: ⚠️ newsletterReactMessage not available`);
+      }
+    } catch (err) {
+      failed++;
+      const errMsg = String(err?.message || err);
+      details.push(`• +${acct}: ❌ ${errMsg.slice(0, 40)}`);
+    }
+
+    if (i < uniqueSocks.length - 1) {
+      await sleep(250);
+    }
+  }
+
+  const summaryText =
+    `╭━━━〔 ⚡ *${title}* 〕━━━┈⊷\n` +
+    `┃ 📢 *Channel:* *${channelName}*\n` +
+    `┃ 🆔 *JID:* \`${jid}\`\n` +
+    `┃ 📌 *Post ID:* \`${serverId}\`\n` +
+    `┃ ✨ *Reaction:* ${emoji}\n` +
+    `┃ 📱 *Total Sessions:* ${uniqueSocks.length}\n` +
+    `┃ ✅ *Success:* ${success}\n` +
+    `┃ ❌ *Failed:* ${failed}\n` +
+    `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+    `📋 *Session Breakdown:*\n` +
+    details.slice(0, 15).join('\n') +
+    (details.length > 15 ? `\n...aur ${details.length - 15} mazeed sessions!` : '') +
+    `\n\n🚀 *Powered by MR SAQIB MD*`;
+
+  await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORTED COMMAND HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * .chreact <post link> [emoji]
+ * Specifically for emoji reactions on channel posts!
+ */
+async function chreactCommand(sock, from, msg, args, isOwner, isAdmin) {
+  const parsed = parseTargetAndEmoji(args, msg, '❤️');
+
+  if ((!parsed.code && !parsed.jid) || !parsed.serverId) {
+    return sock.sendMessage(from, {
+      text: `📢 *MR SAQIB MD — ALL SESSIONS CHANNEL POST REACT*\n\n` +
+            `Tamam connected WhatsApp bot sessions se kisi bhi channel post par react karein!\n\n` +
+            `📌 *Kaise use karein:*\n` +
+            `👉 *${config.prefix}chreact <post_link> [emoji]*\n` +
+            `_Example:_ \`${config.prefix}chreact https://whatsapp.com/channel/.../123 ❤️\``
+    }, { quoted: msg });
+  }
+
+  const resolved = await resolveChannelPost(sock, parsed);
+  if (!resolved.ok) {
+    return sock.sendMessage(from, { text: `❌ ${resolved.error}` }, { quoted: msg });
+  }
+
+  await executeMultiSessionReaction(sock, from, msg, resolved, 'CHANNEL REACTION BOOST');
+}
+
+/**
+ * .vote1 / .vote2 / .vote3 / .vote4 <post link or reply>
+ * Always executes authentic POLL VOTES (NEVER reactions)!
+ * - If target is a Channel Poll -> Casts authentic Channel Poll Vote via official WhatsApp Channel protocol!
+ * - If replying to an In-Chat Poll -> Casts authentic encrypted vote on Option 1/2/3/4!
+ */
+async function voteCommand(sock, from, msg, args, isOwner, isAdmin, optionNum = 1) {
+  const optIndex = (parseInt(optionNum, 10) || 1) - 1;
+
+  // Check 1: Did the user reply to a poll?
+  const quotedPoll = extractQuotedPoll(msg);
+
+  // If quoted poll is from a channel (or has forwarded newsletter info)
+  if (quotedPoll && quotedPoll.isChannel && quotedPoll.newsletterJid && quotedPoll.serverMessageId) {
+    const target = {
+      jid: quotedPoll.newsletterJid,
+      serverId: quotedPoll.serverMessageId,
+      channelName: quotedPoll.channelName || 'WhatsApp Channel',
+      pollInfo: {
+        name: quotedPoll.name,
+        options: quotedPoll.options
+      }
+    };
+    return await executeMultiSessionChannelPollVote(sock, from, msg, target, optIndex);
+  }
+
+  // If quoted poll is a normal in-chat poll (group or DM)
+  if (quotedPoll) {
+    return await executeMultiSessionPollVote(sock, from, msg, quotedPoll, optIndex);
+  }
+
+  // Check 2: Did the user provide a Channel post link or reply to a channel post?
+  const parsed = parseTargetAndEmoji(args, msg);
+  if ((parsed.code || parsed.jid) && parsed.serverId) {
+    const resolved = await resolveChannelPost(sock, parsed);
+    if (!resolved.ok) {
+      return sock.sendMessage(from, { text: `❌ ${resolved.error}` }, { quoted: msg });
+    }
+
+    // Pass custom option text if provided (e.g. .vote1 <link> Assalamualaikum)
+    const optArg = parsed.customOptionText || optIndex;
+    return await executeMultiSessionChannelPollVote(sock, from, msg, resolved, optArg);
+  }
+
+  // Help message if neither poll reply nor channel post was detected
+  return sock.sendMessage(from, {
+    text: `🗳️ *MR SAQIB MD — POLL VOTING (OPTION ${optionNum})*\n\n` +
+          `1️⃣ *WhatsApp Channel Poll par Vote:*\n` +
+          `   👉 Channel post ke reply mein: *${config.prefix}vote${optionNum}*\n` +
+          `   👉 Ya link ke saath: *${config.prefix}vote${optionNum} <channel_post_link>*\n` +
+          `   _Tamam bot sessions se channel poll par real vote lag jayega!_\n\n` +
+          `2️⃣ *WhatsApp Group/Chat Poll par Vote:*\n` +
+          `   👉 Poll ke reply mein likhein: *${config.prefix}vote${optionNum}*\n` +
+          `   _Tamam connected bot sessions se instant real vote lag jayega!_`
+  }, { quoted: msg });
+}
+
+/**
+ * .chvote / .vote <option_number_or_name> [link]
+ * Universal voting command for both WhatsApp Channel Polls and Chat Polls!
+ */
+async function chvoteCommand(sock, from, msg, args, isOwner, isAdmin) {
+  let firstArg = args[0] ? args[0].trim() : '1';
+  let optIndexOrName = firstArg;
+
+  // Check 1: Quoted in-chat or channel poll
+  const quotedPoll = extractQuotedPoll(msg);
+
+  if (quotedPoll && quotedPoll.isChannel && quotedPoll.newsletterJid && quotedPoll.serverMessageId) {
+    const target = {
+      jid: quotedPoll.newsletterJid,
+      serverId: quotedPoll.serverMessageId,
+      channelName: quotedPoll.channelName || 'WhatsApp Channel',
+      pollInfo: {
+        name: quotedPoll.name,
+        options: quotedPoll.options
+      }
+    };
+    return await executeMultiSessionChannelPollVote(sock, from, msg, target, optIndexOrName);
+  }
+
+  if (quotedPoll) {
+    let optIndex = 0;
+    if (/^[0-9]+$/.test(firstArg)) {
+      optIndex = parseInt(firstArg, 10) - 1;
+    } else if (firstArg) {
+      const found = quotedPoll.options.findIndex(o => o.toLowerCase().includes(firstArg.toLowerCase()));
+      if (found !== -1) optIndex = found;
+    }
+    return await executeMultiSessionPollVote(sock, from, msg, quotedPoll, optIndex);
+  }
+
+  // Check 2: Channel link or context
+  const parsed = parseTargetAndEmoji(args, msg);
+  if ((parsed.code || parsed.jid) && parsed.serverId) {
+    const resolved = await resolveChannelPost(sock, parsed);
+    if (!resolved.ok) {
+      return sock.sendMessage(from, { text: `❌ ${resolved.error}` }, { quoted: msg });
+    }
+
+    if (parsed.customOptionText) {
+      optIndexOrName = parsed.customOptionText;
+    }
+    return await executeMultiSessionChannelPollVote(sock, from, msg, resolved, optIndexOrName);
+  }
+
+  return sock.sendMessage(from, {
+    text: `🗳️ *MR SAQIB MD — UNIVERSAL POLL VOTING*\n\n` +
+          `📌 *Kaise Vote Karein:*\n` +
+          `• *${config.prefix}vote1* ➜ Option 1 par vote\n` +
+          `• *${config.prefix}vote2* ➜ Option 2 par vote\n` +
+          `• *${config.prefix}vote3* ➜ Option 3 par vote\n` +
+          `• *${config.prefix}vote <option_naam>* ➜ Specific option par vote\n\n` +
+          `_Channel poll ho ya Group poll, reply kar ke command dein ya channel link paste karein!_`
+  }, { quoted: msg });
+}
+
+module.exports = {
+  chreactCommand,
+  voteCommand,
+  chvoteCommand,
+  executeMultiSessionPollVote,
+  executeMultiSessionChannelPollVote,
+  extractQuotedPoll
+};
