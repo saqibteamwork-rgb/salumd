@@ -3,6 +3,7 @@ const yts = require('yt-search');
 const fs = require('fs').promises;
 const path = require('path');
 const { toAudio } = require('../lib/converter');
+const { ytdlAuto } = require('../lib/ytdlScraper');
 
 const AXIOS_DEFAULTS = {
     timeout: 60000,
@@ -104,6 +105,11 @@ async function songCommand(sock, chatId, message) {
         let finalTitle = video.title;
         
         const apiMethods = [
+            { name: 'MultiSourceYTDL', method: async () => {
+                const r = await ytdlAuto(video.url, 'mp3');
+                if (r && r.status && r.download_url) return { download: r.download_url, title: r.title };
+                throw new Error('MultiSource ytdl failed');
+            }},
             { name: 'EliteProTech', method: () => getEliteProTechDownloadByUrl(video.url) },
             { name: 'Yupra', method: () => getYupraDownloadByUrl(video.url) },
             { name: 'Okatsu', method: () => getOkatsuDownloadByUrl(video.url) },

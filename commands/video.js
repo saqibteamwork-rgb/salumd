@@ -1,6 +1,7 @@
 const axios = require('axios');
 const yts = require('yt-search');
 const settings = require('../settings');
+const { ytdlAuto } = require('../lib/ytdlScraper');
 
 const AXIOS_DEFAULTS = {
     timeout: 60000,
@@ -91,6 +92,11 @@ async function videoCommand(sock, chatId, message) {
         let videoData;
         let downloadSuccess = false;
         const apiMethods = [
+            { name: 'MultiSourceYTDL', method: async () => {
+                const r = await ytdlAuto(videoUrl, '720');
+                if (r && r.status && r.download_url) return { download: r.download_url, title: r.title };
+                throw new Error('MultiSource ytdl video failed');
+            }},
             { name: 'EliteProTech', method: () => getEliteProTechVideoByUrl(videoUrl) },
             { name: 'Yupra', method: () => getYupraVideoByUrl(videoUrl) },
             { name: 'Okatsu', method: () => getOkatsuVideoByUrl(videoUrl) }

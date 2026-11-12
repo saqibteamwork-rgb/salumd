@@ -15,6 +15,7 @@ const axios = require('axios');
 const yts = require('yt-search');
 const ytdl = require('ytdl-lite');
 const settings = require('../settings');
+const { ytdlAuto } = require('../lib/ytdlScraper');
 
 // 30-minute in-memory cache for ultra-smooth re-requests
 const linkCache = new Map();
@@ -78,8 +79,7 @@ async function searchYoutube(query) {
  */
 async function getYoutubeDownloadLinks(url, type = 'mp4') {
     const isAudio = (type === 'mp3' || type === 'audio');
-    const endpoint = isAudio ? 'ytmp3' : 'ytmp4';
-    const proKey = process.env.PRO_APIS_KEY || settings.proApisKey || 'freekey';
+    const format = isAudio ? 'mp3' : '720';
 
     // Check memory cache first (instant response)
     const cacheKey = `${type}:${url}`;
@@ -88,105 +88,27 @@ async function getYoutubeDownloadLinks(url, type = 'mp4') {
         return cached.data;
     }
 
-    // 1. Primary Engine: pro-apis.zone.id (User-Requested Engine) with fast 3s race timeout
-    if (proKey && proKey !== 'freekey') {
-        try {
-            const proUrl = `https://pro-apis.zone.id/api/download/${endpoint}?key=${encodeURIComponent(proKey)}&url=${encodeURIComponent(url)}`;
-            const res = await axios.get(proUrl, {
-                timeout: 3500,
-                headers: { 'User-Agent': USER_AGENTS[0], 'Accept': 'application/json' }
-            });
-
-            const data = res.data;
-            if (data && (data.success || data.status)) {
-                const payload = data.result || data.data || data;
-                const dlLink = payload.download_url || payload.download || payload.url || payload.link || payload.mp4 || payload.mp3 || (typeof payload === 'string' ? payload : null);
-                if (dlLink) {
-                    const resultData = {
-                        title: payload.title || 'YouTube Media',
-                        author: payload.channel || payload.author || 'YouTube Creator',
-                        thumbnail: payload.thumbnail || null,
-                        duration: payload.duration || null,
-                        mp3: isAudio ? dlLink : null,
-                        mp4: isAudio ? null : dlLink,
-                        engine: 'pro-apis.zone.id'
-                    };
-                    linkCache.set(cacheKey, { time: Date.now(), data: resultData });
-                    return resultData;
-                }
-            }
-        } catch (e) {
-            console.warn(`[YouTube DL] Pro-APIs notice: ${e.response?.data?.error || e.message}`);
-        }
-    }
-
-    // 2. High-Speed Direct Engine: ytdl-lite (Fast 1080p MP4 & 320kbps MP3)
+    // Call Multi-Source YouTube Scraper Engine (ytdl-lite, savenow, savetube, ytdown)
     try {
-        if (isAudio) {
-            const res = await ytdl.ytmp3(url);
-            if (res && res.url) {
-                const resultData = {
-                    title: res.title || 'YouTube Audio',
-                    author: res.author || 'YouTube Creator',
-                    thumbnail: res.thumbnail || res.thumbnails?.high || null,
-                    duration: res.duration || null,
-                    mp3: res.url,
-                    mp4: null,
-                    engine: 'ytdl-lite'
-                };
-                linkCache.set(cacheKey, { time: Date.now(), data: resultData });
-                return resultData;
-            }
-        } else {
-            const res = await ytdl.ytmp4(url);
-            if (res && res.url) {
-                const resultData = {
-                    title: res.title || 'YouTube Video',
-                    author: res.author || 'YouTube Creator',
-                    thumbnail: res.thumbnail || res.thumbnails?.high || null,
-                    duration: res.duration || null,
-                    mp3: null,
-                    mp4: res.url,
-                    engine: 'ytdl-lite'
-                };
-                linkCache.set(cacheKey, { time: Date.now(), data: resultData });
-                return resultData;
-            }
+        const result = await ytdlAuto(url, format);
+        if (result && result.status && result.download_url) {
+            const resultData = {
+                title: result.title || 'YouTube Media',
+                author: result.author || 'YouTube Creator',
+                thumbnail: result.thumbnail || null,
+                duration: result.duration || null,
+                mp3: isAudio ? result.download_url : null,
+                mp4: isAudio ? null : result.download_url,
+                engine: 'multi-source-ytdl'
+            };
+            linkCache.set(cacheKey, { time: Date.now(), data: resultData });
+            return resultData;
         }
     } catch (e) {
-        console.warn(`[YouTube DL] ytdl-lite error: ${e.message}`);
+        console.warn(`[YouTube DL] ytdlAuto error: ${e.message}`);
     }
 
-    // 3. Fallback to pro-apis.zone.id with freekey if not checked yet
-    if (!proKey || proKey === 'freekey') {
-        try {
-            const proUrl = `https://pro-apis.zone.id/api/download/${endpoint}?key=freekey&url=${encodeURIComponent(url)}`;
-            const res = await axios.get(proUrl, {
-                timeout: 2500,
-                headers: { 'User-Agent': USER_AGENTS[0], 'Accept': 'application/json' }
-            });
-            const data = res.data;
-            if (data && (data.success || data.status)) {
-                const payload = data.result || data.data || data;
-                const dlLink = payload.download_url || payload.download || payload.url || payload.link || payload.mp4 || payload.mp3 || (typeof payload === 'string' ? payload : null);
-                if (dlLink) {
-                    const resultData = {
-                        title: payload.title || 'YouTube Media',
-                        author: payload.channel || payload.author || 'YouTube Creator',
-                        thumbnail: payload.thumbnail || null,
-                        duration: payload.duration || null,
-                        mp3: isAudio ? dlLink : null,
-                        mp4: isAudio ? null : dlLink,
-                        engine: 'pro-apis.zone.id'
-                    };
-                    linkCache.set(cacheKey, { time: Date.now(), data: resultData });
-                    return resultData;
-                }
-            }
-        } catch {}
-    }
-
-    throw new Error('Download links generate nahi ho sake. Baraye meharbani valid YouTube video try karein.');
+    throw new Error('Download link generate nahi ho saka. Baraye meharbani valid YouTube video try karein.');
 }
 
 /**
