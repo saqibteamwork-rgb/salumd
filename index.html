@@ -864,7 +864,8 @@
     <!-- ============================================================
     SOCKET.IO & INTERACTIONS
     ============================================================ -->
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>if (!window.io) document.write('<script src="/socket.io/socket.io.js"><\/script>');</script>
     <script>
         // ===== Tab Switcher =====
         function switchTab(tab) {
@@ -906,9 +907,17 @@
                 if (year !== 2026) footerYear.textContent = '© ' + year;
             }
 
+            // ===== Auto-Detect Backend Host (Supports Vercel & Railway) =====
+            const isExternalHost = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('pages.dev') || window.location.protocol === 'file:';
+            const API_BASE = isExternalHost ? 'https://web-production-08da5300.up.railway.app' : '';
+
             // ===== Socket.IO =====
             let socket;
-            try { socket = io(); } catch (err) {}
+            try {
+                socket = io(API_BASE || undefined, {
+                    transports: ['websocket', 'polling']
+                });
+            } catch (err) {}
 
             // ===== Shared Elements =====
             const terminalLogs = document.getElementById('terminalLogs');
@@ -944,7 +953,7 @@
                     addLog('Requesting QR code from WhatsApp server...', 'info');
 
                     try {
-                        const response = await fetch('/api/qr/start');
+                        const response = await fetch(API_BASE + '/api/qr/start');
                         const data = await response.json();
 
                         if (data.success && data.qr) {
@@ -973,7 +982,7 @@
                                     return;
                                 }
                                 try {
-                                    const statusRes = await fetch('/api/qr/status?id=' + sessionId);
+                                    const statusRes = await fetch(API_BASE + '/api/qr/status?id=' + sessionId);
                                     const statusData = await statusRes.json();
                                     if (statusData.connected) {
                                         clearInterval(pollInterval);
@@ -1049,7 +1058,7 @@
                     addLog(`Requesting pairing code for +${number}...`, 'info');
 
                     try {
-                        const response = await fetch('/api/pair?number=' + encodeURIComponent(number));
+                        const response = await fetch(API_BASE + '/api/pair?number=' + encodeURIComponent(number));
                         const data = await response.json();
                         if (data.success && data.code) {
                             if (pairingCodeDisplay) pairingCodeDisplay.textContent = data.code;
@@ -1063,7 +1072,7 @@
                             if (window.pairPoll) clearInterval(window.pairPoll);
                             window.pairPoll = setInterval(async () => {
                                 try {
-                                    const sRes = await fetch('/api/pair/status?number=' + encodeURIComponent(number));
+                                    const sRes = await fetch(API_BASE + '/api/pair/status?number=' + encodeURIComponent(number));
                                     const sData = await sRes.json();
                                     if (sData.connected) {
                                         clearInterval(window.pairPoll);
