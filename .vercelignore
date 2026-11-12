@@ -1,0 +1,22 @@
+# Vercel Deployment Ignore File
+# Only static frontend files (index.html, public/) are deployed to Vercel
+
+commands/
+plugins/
+lib/
+data/
+database/
+auth_info/
+media/
+temp/
+tmp/
+*.bat
+Dockerfile
+nixpacks.toml
+Procfile
+railway.json
+ecosystem.config.js
+settings.js
+config.js
+index.js
+test_*
