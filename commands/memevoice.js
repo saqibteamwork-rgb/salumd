@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Voice Note & Meme Audio Module
+ * SALU MD :: Voice Note & Meme Audio Module
  * ============================================================================
  * Commands:
  * - .malik : Sends Malik voice note (PTT)
@@ -42,7 +42,7 @@ async function handleMemeVoiceCommand(sock, from, msg, cmd) {
             const promoPath = path.join(MEDIA_DIR, 'promo.mp4');
             if (fs.existsSync(promoPath)) {
                 const buffer = fs.readFileSync(promoPath);
-                await sock.sendMessage(from, { video: buffer, caption: "⚡ *MR SAQIB MD Official Promo*" }, { quoted: msg });
+                await sock.sendMessage(from, { video: buffer, caption: "⚡ *SALU MD Official Promo*" }, { quoted: msg });
                 return;
             }
         }

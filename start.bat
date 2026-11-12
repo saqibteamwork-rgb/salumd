@@ -1,8 +1,8 @@
 @echo off
-title MR SAQIB MD - WhatsApp Bot
+title SALU MD - WhatsApp Bot
 cd /d "%~dp0"
 echo =======================================================
-echo           MR SAQIB MD - WHATSAPP BOT LAUNCHER
+echo           SALU MD - WHATSAPP BOT LAUNCHER
 echo =======================================================
 echo.
 echo [1] Checking Node.js installation...

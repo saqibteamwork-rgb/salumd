@@ -17,10 +17,10 @@ async (conn, mek, m, { from, sender }) => {
         const diff = Math.max(1, end - start);
 
         const text = 
-`╭━━━〔 ⚡ *MR SAQIB MD SPEED* 〕━━━┈⊷
+`╭━━━〔 ⚡ *SALU MD SPEED* 〕━━━┈⊷
 ┃ 🚀 *Response Speed:* ${diff}ms (${(diff/1000).toFixed(3)}s)
 ┃ 🟢 *Status:* Online & Active
-┃ 👑 *Owner:* MR SAQIB
+┃ 👑 *Owner:* SALU
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         await conn.sendMessage(from, {
@@ -30,7 +30,7 @@ async (conn, mek, m, { from, sender }) => {
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: '120363421389121979@newsletter',
-                    newsletterName: "MR SAQIB MD",
+                    newsletterName: "SALU MD",
                     serverMessageId: 1
                 }
             }

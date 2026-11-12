@@ -192,7 +192,7 @@ async function fancyCommand(sock, from, msg, args = []) {
 ┃
 ┃ 💡 *Example:*
 ┃ .style Ramzan
-┃ .fancy MR SAQIB
+┃ .fancy SALU
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -204,7 +204,7 @@ async function fancyCommand(sock, from, msg, args = []) {
         result += `*${idx + 1}. ${st.name}:*\n${styled}\n\n`;
     });
 
-    result += `⚡ *Powered by MR SAQIB MD*`;
+    result += `⚡ *Powered by SALU MD*`;
 
     await sock.sendMessage(from, { text: result.trim() }, { quoted: msg });
 }

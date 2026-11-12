@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: ANTI-STATUS PROTECTION ENGINE (.antistatus)
+ * SALU MD :: ANTI-STATUS PROTECTION ENGINE (.antistatus)
  * ============================================================================
  * Protects groups from WhatsApp status broadcast mentions and status forwards.
  * Modes:
@@ -46,7 +46,7 @@ async function antistatusCommand(sock, from, msg, isAdmin, botData, saveBotData,
 ┃   └ Protection disable karega
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD Protection*`;
+🚀 *SALU MD Protection*`;
         return await sock.sendMessage(from, { text: card }, { quoted: msg });
     }
 

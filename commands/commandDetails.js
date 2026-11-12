@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: COMMAND DETAILS & USAGE GUIDE ENGINE
+ * SALU MD :: COMMAND DETAILS & USAGE GUIDE ENGINE
  * ============================================================================
  * Triggered when a user types:
  * - .<command> d          (e.g. .arc d, .kick d, .rs d, .play d, .tiktok d)
@@ -42,7 +42,7 @@ const COMMAND_GUIDES = {
     category: 'CHANNEL',
     permission: 'Owner Only 👑',
     usage: '.chautojoin <channel_link>',
-    desc: 'Tamam connected bot accounts (Muhammad Saqib, Mrsaqib, 😳😉) se ek click mein kisi bhi channel ko follow/join karwayein.',
+    desc: 'Tamam connected bot accounts (SALU, Mrsaqib, 😳😉) se ek click mein kisi bhi channel ko follow/join karwayein.',
     params: [
       '<channel_link>: WhatsApp Channel ka link'
     ],
@@ -205,7 +205,7 @@ const COMMAND_GUIDES = {
     ],
     examples: [
       '(Photo ko reply karein) ➜ .s',
-      '(Photo ko reply karein) ➜ .s MR SAQIB | BOT'
+      '(Photo ko reply karein) ➜ .s SALU | BOT'
     ]
   },
 
@@ -684,7 +684,7 @@ async function sendCommandDetails(sock, from, msg, targetCmd) {
 ┃ 💡 *Tip:* Command ke aage apne arguments daal kar try karein!
 ┃    Example: \`.${cleanCmd} help\`
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
     return await sock.sendMessage(from, { text: out }, { quoted: msg });
   }
@@ -716,7 +716,7 @@ ${guide.usage.split('\n').map(l => `┃ 👉 \`${l}\``).join('\n')}
     });
   }
 
-  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n⚡ *MR SAQIB MD — Smart Helper*`;
+  text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n⚡ *SALU MD — Smart Helper*`;
 
   await sock.sendMessage(from, { text }, { quoted: msg });
 }

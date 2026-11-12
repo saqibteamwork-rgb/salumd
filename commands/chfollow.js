@@ -70,7 +70,7 @@ module.exports = {
     const input = args[0];
     if (!input) {
       return reply(
-        `📢 *MR SAQIB MD — ALL SESSIONS CHANNEL FOLLOWER BOOSTER*\n\n` +
+        `📢 *SALU MD — ALL SESSIONS CHANNEL FOLLOWER BOOSTER*\n\n` +
         `📌 *Usage:*\n` +
         `  ${config.prefix}chfollow <channel link or jid>\n` +
         `  ${config.prefix}chunfollow <channel link or jid>\n\n` +
@@ -181,7 +181,7 @@ module.exports = {
       `*Session Logs:*\n` +
       details.slice(0, 20).join('\n') +
       (details.length > 20 ? `\n...and ${details.length - 20} more sessions` : '') +
-      `\n\n⚡ *Powered by ${config.botName || 'MR SAQIB MD'}*`;
+      `\n\n⚡ *Powered by ${config.botName || 'SALU MD'}*`;
 
     return reply(summary);
   },

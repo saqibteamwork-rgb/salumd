@@ -1,8 +1,10 @@
-async function privateCommand(sock, from, msg, isAdmin, session) {
-    if (!isAdmin) return await sock.sendMessage(from, { text: "❌ Only owner can use this command." }, { quoted: msg });
+async function privateCommand(sock, from, msg, isOwner, session) {
+    if (!isOwner) return await sock.sendMessage(from, { text: "❌ Sirf Bot Owner hi mode badal sakta hai." }, { quoted: msg });
     
     session.isPublic = false;
-    await sock.sendMessage(from, { text: "🔐 Bot is now in PRIVATE mode. Only the owner can use it." }, { quoted: msg });
+    await sock.sendMessage(from, { 
+        text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Owner* aur *Bot User* hi commands use kar sakte hain." 
+    }, { quoted: msg });
 }
 
 module.exports = privateCommand;

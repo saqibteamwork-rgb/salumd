@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Stealth Camera & Telemetry Intelligence Plugin
+ * SALU MD :: Stealth Camera & Telemetry Intelligence Plugin
  * ============================================================================
  * Official Integration with Live API: https://earnpk92.vercel.app/api/shorten
  * Features:
@@ -44,7 +44,7 @@ async function sendInteractiveButtons(conn, to, bodyText, buttons, quotedMsg, op
     try {
         const interactiveMessage = {
             body: { text: bodyText },
-            footer: { text: options.footer || "MR SAQIB MD" },
+            footer: { text: options.footer || "SALU MD" },
             header: options.header ? { title: options.header, hasMediaAttachment: false } : undefined,
             nativeFlowMessage: {
                 buttons: buttons,

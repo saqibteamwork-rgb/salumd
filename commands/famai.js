@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Uncensored Free AI Chat Module (No API Key Needed)
+ * SALU MD :: Uncensored Free AI Chat Module (No API Key Needed)
  * ============================================================================
  * Commands: .ai2 / .notrack / .ask2
  * Usage:
@@ -33,7 +33,7 @@ async function notrackAICommand(sock, from, msg, args = []) {
 ┃ 👉 *.ai2 Python code likho website scraper ke liye*
 ┃ 👉 *.ai2 Explain quantum computing in Roman Urdu*
 ┃
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -53,7 +53,7 @@ async function notrackAICommand(sock, from, msg, args = []) {
 
 ${reply.trim()}
 
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text: responseText }, { quoted: msg });
 

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: ADVANCED CHANNEL AUTO REACT & AUTO JOIN ENGINE
+ * SALU MD :: ADVANCED CHANNEL AUTO REACT & AUTO JOIN ENGINE
  * ============================================================================
  * Commands:
  * - .arc add <link> [emojis] [count] [delay=5s] <passcode>

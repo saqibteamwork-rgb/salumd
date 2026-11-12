@@ -148,7 +148,7 @@ async function generateLoveCardImage(name) {
             <text x="400" y="485" font-family="sans-serif" font-size="26" fill="#ffffff" text-anchor="middle">💍 💕 ✨</text>
 
             <!-- Bottom Tag -->
-            <text x="400" y="745" font-family="sans-serif" font-size="18" font-weight="bold" fill="#ff758c" text-anchor="middle" letter-spacing="3">POWERED BY MR SAQIB MD</text>
+            <text x="400" y="745" font-family="sans-serif" font-size="18" font-weight="bold" fill="#ff758c" text-anchor="middle" letter-spacing="3">POWERED BY SALU MD</text>
         </svg>`;
 
         return await sharp(Buffer.from(svg)).png().toBuffer();
@@ -220,7 +220,7 @@ async function loveCommand(sock, from, msg, args) {
 ┃ 👑 𝐹𝓇𝑜𝓂: ${senderTag} 🌸
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         // Generate glowing HD image card
         const cardImage = await generateLoveCardImage(targetName);
@@ -230,7 +230,7 @@ async function loveCommand(sock, from, msg, args) {
             isForwarded: true,
             forwardedNewsletterMessageInfo: {
                 newsletterJid: '120363421389121979@newsletter',
-                newsletterName: 'MR SAQIB MD',
+                newsletterName: 'SALU MD',
                 serverMessageId: -1
             }
         };

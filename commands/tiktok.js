@@ -25,7 +25,7 @@ async function tiktokCommand(sock, from, msg, q) {
 ┃ .tt https://vt.tiktok.com/...
 ┃ .tiktok https://www.tiktok.com/@user/video/...
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *${settings.botName || 'MR SAQIB MD'}*`
+🚀 *${settings.botName || 'SALU MD'}*`
         }, { quoted: msg });
     }
 
@@ -88,7 +88,7 @@ async function tiktokCommand(sock, from, msg, q) {
 `╭━━━〔 📱 *TIKTOK DOWNLOADED* 〕━━━┈⊷
 ┃ 📌 *Title:* ${title.slice(0, 70)}
 ┃ 👤 *Author:* ${author}
-┃ ⚡ *Powered by:* ${settings.botName || 'MR SAQIB MD'}
+┃ ⚡ *Powered by:* ${settings.botName || 'SALU MD'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         // Direct URL stream with buffer fallback

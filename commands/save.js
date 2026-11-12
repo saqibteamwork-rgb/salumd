@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: STATUS & MEDIA SAVER ENGINE (.save)
+ * SALU MD :: STATUS & MEDIA SAVER ENGINE (.save)
  * ============================================================================
  * Allows users to easily save WhatsApp Status (Photo, Video, Audio, Text)
  * and download any replied media (Image, Video, Audio, Sticker, Document,
@@ -31,7 +31,7 @@ async function saveCommand(sock, from, msg, args = []) {
 ┃ message ko reply karke *.save* likhein!
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD Engine*`;
+🚀 *SALU MD Engine*`;
         return await sock.sendMessage(from, { text: guide }, { quoted: msg });
     }
 
@@ -64,7 +64,7 @@ async function saveCommand(sock, from, msg, args = []) {
 `╭━━━〔 ${header} 〕━━━┈⊷
 ┃ 👤 *From:* +${senderNumber}${originalCaption}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *Saved by MR SAQIB MD*`;
+🚀 *Saved by SALU MD*`;
 
             await sock.sendMessage(from, {
                 image: buffer,
@@ -86,7 +86,7 @@ async function saveCommand(sock, from, msg, args = []) {
 `╭━━━〔 ${header} 〕━━━┈⊷
 ┃ 👤 *From:* +${senderNumber}${originalCaption}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *Saved by MR SAQIB MD*`;
+🚀 *Saved by SALU MD*`;
 
             await sock.sendMessage(from, {
                 video: buffer,
@@ -146,7 +146,7 @@ async function saveCommand(sock, from, msg, args = []) {
 ┃ 👤 *From:* +${senderNumber}
 ┃ 💬 *Text:* ${textContent}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *Saved by MR SAQIB MD*`;
+🚀 *Saved by SALU MD*`;
 
             await sock.sendMessage(from, { text: caption }, { quoted: msg });
             await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});

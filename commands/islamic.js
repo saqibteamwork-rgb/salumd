@@ -94,7 +94,7 @@ async function azkarCommand(sock, from, msg) {
 ┃
 ┃ 📖 _${pick.meaning}_
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
     await sock.sendMessage(from, { text }, { quoted: msg });
 }
 

@@ -8,7 +8,7 @@ async function pinterestCommand(sock, from, msg, args) {
         const fullQuery = (args || []).join(' ').trim();
         if (!fullQuery) {
             return await sock.sendMessage(from, {
-                text: "📌 *PINTEREST SEARCH - MR SAQIB MD*\n\nUsage: *.pinterest <search> | <count>*\n\nExample:\n👉 *.pinterest cute cat | 2*\n👉 *.pin dark aesthetic*"
+                text: "📌 *PINTEREST SEARCH - SALU MD*\n\nUsage: *.pinterest <search> | <count>*\n\nExample:\n👉 *.pinterest cute cat | 2*\n👉 *.pin dark aesthetic*"
             }, { quoted: msg });
         }
 
@@ -46,7 +46,7 @@ async function pinterestCommand(sock, from, msg, args) {
 ┃ 📊 *Result:* ${i + 1} of ${total}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
             await sock.sendMessage(from, {
                 image: { url: item.image },

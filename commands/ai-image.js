@@ -6,7 +6,7 @@ async function aiImageCommand(sock, from, msg, args, commandName = 'flux') {
         const prompt = (args || []).join(' ').trim();
         if (!prompt) {
             return await sock.sendMessage(from, {
-                text: `🎨 *AI IMAGE GENERATOR - MR SAQIB MD*\n\nUsage: *${commandName.startsWith('.') ? '' : '.'}${commandName} <description>*\n\nExample:\n👉 *.flux a futuristic cyberpunk city with neon lights*\n👉 *.imagine a cute baby lion wearing a crown*`
+                text: `🎨 *AI IMAGE GENERATOR - SALU MD*\n\nUsage: *${commandName.startsWith('.') ? '' : '.'}${commandName} <description>*\n\nExample:\n👉 *.flux a futuristic cyberpunk city with neon lights*\n👉 *.imagine a cute baby lion wearing a crown*`
             }, { quoted: msg });
         }
 
@@ -32,7 +32,7 @@ async function aiImageCommand(sock, from, msg, args, commandName = 'flux') {
 ┃ 📝 *Prompt:* ${prompt}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, {
             image: response.data,

@@ -1,4 +1,4 @@
-// commands/sticker.js - High Quality Sticker Maker with Custom EXIF (MR SAQIB MD)
+// commands/sticker.js - High Quality Sticker Maker with Custom EXIF (SALU MD)
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const sharp = require('sharp');
 const webpmux = require('node-webpmux');
@@ -8,7 +8,7 @@ const { exec } = require('child_process');
 const ffmpegStatic = require('ffmpeg-static');
 
 // Helper to inject WhatsApp sticker EXIF metadata
-async function addExif(webpBuffer, packname = 'MR SAQIB MD', author = 'MR SAQIB') {
+async function addExif(webpBuffer, packname = 'SALU MD', author = 'SALU') {
     try {
         const img = new webpmux.Image();
         await img.load(webpBuffer);
@@ -66,13 +66,13 @@ async function stickerCommand(sock, from, msg, args) {
         const media = extractMedia(msg);
         if (!media) {
             return await sock.sendMessage(from, {
-                text: "🎨 *STICKER MAKER - MR SAQIB MD*\n\nReply to an *image*, *gif*, or *short video (≤10s)* with:\n👉 *.sticker* ya *.s*\n\n💡 *Custom Pack Name:*\n*.sticker MyPack|MyName*"
+                text: "🎨 *STICKER MAKER - SALU MD*\n\nReply to an *image*, *gif*, or *short video (≤10s)* with:\n👉 *.sticker* ya *.s*\n\n💡 *Custom Pack Name:*\n*.sticker MyPack|MyName*"
             }, { quoted: msg });
         }
 
         // Custom pack and author if provided in args
-        let packname = 'MR SAQIB MD';
-        let author = 'MR SAQIB';
+        let packname = 'SALU MD';
+        let author = 'SALU';
         if (args && args.length > 0) {
             const rawArgs = args.join(' ');
             if (rawArgs.includes('|')) {
@@ -163,7 +163,7 @@ async function takeCommand(sock, from, msg, args) {
     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     if (!quoted?.stickerMessage) {
         return await sock.sendMessage(from, {
-            text: "❌ Kisi sticker ko reply kar ke *.take* likhein!\n\nExample: *.take MR SAQIB|BOT*"
+            text: "❌ Kisi sticker ko reply kar ke *.take* likhein!\n\nExample: *.take SALU|BOT*"
         }, { quoted: msg });
     }
     return await stickerCommand(sock, from, msg, args);

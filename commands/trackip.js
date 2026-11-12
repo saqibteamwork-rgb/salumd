@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: IP Geolocation & Network Tracker
+ * SALU MD :: IP Geolocation & Network Tracker
  * ============================================================================
  * Commands: .trackip / .iptrack / .ip
  * Usage:
@@ -34,7 +34,7 @@ async function trackipCommand(sock, from, msg, args = []) {
 ┃ 👉 *.trackip 112.90.150.204*
 ┃ 👉 *.ip 8.8.8.8*
 ┃
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -78,7 +78,7 @@ async function trackipCommand(sock, from, msg, args = []) {
 ┃ 🕒 *Timezone:* ${info.timezone?.id || 'N/A'} (${info.timezone?.utc || 'UTC'})
 ┃ ⏰ *Local Time:* ${info.timezone?.current_time ? new Date(info.timezone.current_time).toLocaleTimeString() : 'N/A'}
 ┃ 📍 *Google Maps:* ${mapsUrl}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         await sock.sendMessage(from, { text: cardText }, { quoted: msg });

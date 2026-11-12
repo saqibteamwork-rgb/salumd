@@ -17,7 +17,7 @@ async function tourlCommand(sock, from, msg) {
         const target = quoted || msg.message;
         if (!target) {
             return await sock.sendMessage(from, {
-                text: "📎 *TOURL UPLOADER - MR SAQIB MD*\n\nKisi bhi image, video, audio, sticker ya document ko reply karein aur likhein:\n👉 *.tourl* ya *.url*"
+                text: "📎 *TOURL UPLOADER - SALU MD*\n\nKisi bhi image, video, audio, sticker ya document ko reply karein aur likhein:\n👉 *.tourl* ya *.url*"
             }, { quoted: msg });
         }
 
@@ -110,16 +110,16 @@ async function tourlCommand(sock, from, msg) {
 ┃ ${url}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, {
             text: replyText,
             contextInfo: {
                 externalAdReply: {
-                    title: "MR SAQIB MD - Media Uploader",
+                    title: "SALU MD - Media Uploader",
                     body: `File uploaded: ${fileSizeFormatted}`,
                     mediaType: 1,
-                    thumbnailUrl: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_7oG52NZUY.png",
+                    thumbnailUrl: "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp",
                     sourceUrl: url,
                     renderLargerThumbnail: false
                 }

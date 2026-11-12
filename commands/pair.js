@@ -212,7 +212,7 @@ async function pairCommand(sock, from, msg, args, isOwner, isAdmin, sessions, Bo
 
         await sock.sendMessage(from, {
             text:
-                `╭━━━〔 🔑 *MR SAQIB MD — PAIRING CODE* 〕━━━┈⊷\n` +
+                `╭━━━〔 🔑 *SALU MD — PAIRING CODE* 〕━━━┈⊷\n` +
                 `┃ 📌 *Usage:*\n` +
                 `┃ .pair <phone number with country code>\n` +
                 `┃ \n` +
@@ -305,7 +305,7 @@ async function pairCommand(sock, from, msg, args, isOwner, isAdmin, sessions, Bo
             `┃ ⏰ Code 60 seconds ke liye valid hai!\n` +
             `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
             `📋 *Niche diye gaye message par 1-tap karein code copy karne ke liye!* 👇\n\n` +
-            `🚀 *Powered by MR SAQIB MD*`;
+            `🚀 *Powered by SALU MD*`;
 
         // 1. Send the main card directly in the group/chat with user tag
         await sock.sendMessage(from, {

@@ -1,6 +1,6 @@
 module.exports = {
   apps : [{
-    name: "mr-saqib-md",
+    name: "salu-md",
     script: "./index.js",
     node_args: "--experimental-require-module --expose-gc --max-old-space-size=460",
     watch: false,

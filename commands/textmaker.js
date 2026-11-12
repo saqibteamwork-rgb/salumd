@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Textmaker & Visual Effects Suite
+ * SALU MD :: Textmaker & Visual Effects Suite
  * ============================================================================
  * Instant Offline HD Banner Generation with Sharp & SVG:
  * 1.  .neon        - Cyberpunk neon cyan glow
@@ -199,7 +199,7 @@ function escapeXml(unsafe) {
 async function generateTextBanner(text, themeName) {
     const t = THEMES[themeName] || THEMES.neon;
     const safeText = escapeXml(text.toUpperCase().slice(0, 30));
-    const botTitle = escapeXml((settings.botName || 'MR SAQIB MD').toUpperCase());
+    const botTitle = escapeXml((settings.botName || 'SALU MD').toUpperCase());
 
     const svg = `
 <svg width="900" height="360" xmlns="http://www.w3.org/2000/svg">
@@ -263,7 +263,7 @@ async function textmakerCommand(sock, from, msg, args = [], effectName = 'neon')
 ┃ 🔤 *Text:* ${text}
 ┃ 🖼️ *Quality:* Ultra HD 900x360
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, {
             image: imageBuffer,

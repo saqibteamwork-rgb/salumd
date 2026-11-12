@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Credit Card Generator & BIN Checker
+ * SALU MD :: Credit Card Generator & BIN Checker
  * ============================================================================
  * Commands: .gencc / .gen / .bin
  * Usage:
@@ -36,7 +36,7 @@ async function genccCommand(sock, from, msg, args = []) {
 ┃ 👉 *.gencc 453590*
 ┃
 ┃ ⚠️ *Note:* For testing & development purposes only!
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -63,14 +63,14 @@ async function genccCommand(sock, from, msg, args = []) {
 `╭━━━〔 ⚡ ${toSansBold('CREDIT CARD GENERATOR')} ⚡ 〕━━━┈⊷
 ┃ 🔢 *BIN:* \`${text}\`
 ┃ 📊 *Count:* ${data.length}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n`;
 
         data.forEach((cc, idx) => {
             cardText += `\`${cc}\`\n`;
         });
 
-        cardText += `\n💡 *1-Tap Copy:* Kisi bhi line par tap kar ke copy karein!\n⚡ *Powered by MR SAQIB MD*`;
+        cardText += `\n💡 *1-Tap Copy:* Kisi bhi line par tap kar ke copy karein!\n⚡ *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text: cardText }, { quoted: msg });
 

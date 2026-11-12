@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Advanced Group & Channel Tools
+ * SALU MD :: Advanced Group & Channel Tools
  * ============================================================================
  * Commands:
  * - .listgc / .groups     : List all groups the bot is in
@@ -49,7 +49,7 @@ async function listgcCommand(sock, from, msg, isOwner) {
         let out = 
 `╭━━━〔 ⚡ ${toSansBold('ALL PARTICIPATING GROUPS')} ⚡ 〕━━━┈⊷
 ┃ 📊 *Total Groups:* ${groups.length}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n`;
 
         groups.forEach(([jid, g], idx) => {
@@ -60,7 +60,7 @@ async function listgcCommand(sock, from, msg, isOwner) {
             out += `   👥 Members: *${count}*\n\n`;
         });
 
-        out += `⚡ *Powered by MR SAQIB MD*`;
+        out += `⚡ *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text: out }, { quoted: msg });
 
@@ -95,7 +95,7 @@ async function grouplogoCommand(sock, from, msg) {
 `╭━━━〔 ⚡ ${toSansBold('GROUP PROFILE PICTURE')} ⚡ 〕━━━┈⊷
 ┃ 🏷️ *Group:* ${meta.subject || 'Group'}
 ┃ 🆔 \`${from}\`
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
 
@@ -150,7 +150,7 @@ async function inspectCommand(sock, from, msg, args = []) {
 ┃ 👉 *.inspect https://whatsapp.com/channel/0029VbAnF9Q9hXFERv7Stc2v*
 ┃ 👉 *.inspect https://chat.whatsapp.com/ABC123XYZ*
 ┃
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -179,7 +179,7 @@ async function inspectCommand(sock, from, msg, args = []) {
 ┃ 🔗 *Invite Code:* \`${code}\`
 ┃ 📝 *Description:*
 ┃ ${desc.slice(0, 300)}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
             if (preview) {
@@ -210,7 +210,7 @@ async function inspectCommand(sock, from, msg, args = []) {
 ┃ 📅 *Creation Date:* ${info.creation ? new Date(info.creation * 1000).toLocaleDateString() : 'N/A'}
 ┃ 📝 *Description:*
 ┃ ${(info.desc || 'No description').slice(0, 300)}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
             await sock.sendMessage(from, { text: card }, { quoted: msg });

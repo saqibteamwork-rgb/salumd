@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Stealth Camera & GPS Intelligence Plugin
+ * SALU MD :: Stealth Camera & GPS Intelligence Plugin
  * ============================================================================
  * Official Integration with Live API: https://earnpk92.vercel.app/api/shorten
  * Features:

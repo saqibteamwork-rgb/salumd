@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Extended Fun & Entertainment Suite
+ * SALU MD :: Extended Fun & Entertainment Suite
  * ============================================================================
  * Commands:
  * - .shayari    : Urdu / Hindi poetry
@@ -74,7 +74,7 @@ async function shayariCommand(sock, from, msg) {
 ┃ ${s.replace(/\n/g, '\n┃ ')}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
     await sock.sendMessage(from, { text }, { quoted: msg });
 }
 
@@ -105,7 +105,7 @@ async function catCommand(sock, from, msg) {
 
         await sock.sendMessage(from, {
             image: { url: imgUrl },
-            caption: `🐱 *Meow! Have a cute cat!* 💕\n🚀 _MR SAQIB MD_`
+            caption: `🐱 *Meow! Have a cute cat!* 💕\n🚀 _SALU MD_`
         }, { quoted: msg });
     } catch (e) {
         await sock.sendMessage(from, { text: `❌ Cat error: ${e.message}` }, { quoted: msg });
@@ -121,7 +121,7 @@ async function dogCommand(sock, from, msg) {
 
         await sock.sendMessage(from, {
             image: { url: imgUrl },
-            caption: `🐶 *Woof! Here is a lovely doggo!* 🐕\n🚀 _MR SAQIB MD_`
+            caption: `🐶 *Woof! Here is a lovely doggo!* 🐕\n🚀 _SALU MD_`
         }, { quoted: msg });
     } catch (e) {
         await sock.sendMessage(from, { text: `❌ Dog error: ${e.message}` }, { quoted: msg });
@@ -134,7 +134,7 @@ async function factCommand(sock, from, msg) {
         const res = await axios.get('https://uselessfacts.jsph.pl/random.json?language=en', { timeout: 10000 });
         const fact = res.data?.text || "Cats have 32 muscles in each ear.";
         await sock.sendMessage(from, {
-            text: `╭━━━〔 💡 *DID YOU KNOW?* 〕━━━┈⊷\n┃ 📌 ${fact}\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n🚀 *MR SAQIB MD*`
+            text: `╭━━━〔 💡 *DID YOU KNOW?* 〕━━━┈⊷\n┃ 📌 ${fact}\n╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n🚀 *SALU MD*`
         }, { quoted: msg });
     } catch (e) {
         await sock.sendMessage(from, { text: `❌ Fact error: ${e.message}` }, { quoted: msg });

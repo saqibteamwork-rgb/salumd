@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Advanced Search Suite
+ * SALU MD :: Advanced Search Suite
  * ============================================================================
  * Commands:
  * - .google <query>    : Google / Web search with top ranked results
@@ -63,7 +63,7 @@ async function googleCommand(sock, from, msg, args = []) {
             out += `🔗 ${item.url}\n\n`;
         });
 
-        out += `🚀 *Powered by MR SAQIB MD*`;
+        out += `🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text: out.trim() }, { quoted: msg });
     } catch (e) {
@@ -130,7 +130,7 @@ ${artist ? `┃ 👤 *Artist:* ${artist}\n` : ''}╰━━━━━━━━━�
 
 ${lyricsText}
 
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text: caption }, { quoted: msg });
     } catch (e) {
@@ -168,7 +168,7 @@ async function ringtoneCommand(sock, from, msg, args = []) {
 ┃ ⏱️ *Duration:* ${video.timestamp || 'N/A'}
 ┃ 👤 *Channel:* ${video.author?.name || 'Unknown'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, {
             audio: { url: media.downloadUrl },
@@ -232,7 +232,7 @@ async function playstoreCommand(sock, from, msg, args = []) {
 ┃ 🔗 *Download Link:*
 ┃ ${appUrl}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text: out }, { quoted: msg });
     } catch (e) {
@@ -269,7 +269,7 @@ async function githubCommand(sock, from, msg, args = []) {
 ┃ 🐛 *Open Issues:* ${repo.open_issues_count}
 ┃ 🌐 *URL:* ${repo.html_url}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
             return await sock.sendMessage(from, { text }, { quoted: msg });
         }
@@ -289,7 +289,7 @@ async function githubCommand(sock, from, msg, args = []) {
 ┃ 👥 *Followers:* ${user.followers} | *Following:* ${user.following}
 ┃ 🌐 *Profile URL:* ${user.html_url}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         if (user.avatar_url) {
             await sock.sendMessage(from, { image: { url: user.avatar_url }, caption: text }, { quoted: msg });

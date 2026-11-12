@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Greetings & Wishes Suite
+ * SALU MD :: Greetings & Wishes Suite
  * ============================================================================
  * Commands:
  * - .morning / .gm / .moring / .goodmorning : Good Morning wishes & inspirational quotes
@@ -40,7 +40,7 @@ const THANKS_REPLIES = [
     "😇 *Always a pleasure!* Agar kisi bhi aur cheez ki zaroorat ho to bina jhijhak batayein! 🚀",
     "💫 *Most welcome pyaare dost!* May your day be blessed and filled with happiness! 🌷",
     "🤝 *JazakAllahu Khairan!* Shukriya aapki izzat, mohabat aur support ka! ❤️",
-    "🎉 *Anytime!* MR SAQIB MD hamesha aapki khidmat ke liye ready hai! ⚡"
+    "🎉 *Anytime!* SALU MD hamesha aapki khidmat ke liye ready hai! ⚡"
 ];
 
 const AFTERNOON_WISHES = [
@@ -101,7 +101,7 @@ async function morningCommand(sock, from, msg, args = []) {
 ┃
 ┃ 💐 *Have a blessed & energetic day!*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         } else {
             text =
 `╭━━━〔 🌅 *GOOD MORNING / SUBAH BAKHAIR* 〕━━━┈⊷
@@ -111,7 +111,7 @@ async function morningCommand(sock, from, msg, args = []) {
 ┃
 ┃ ☕ *May your day be filled with smiles!*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         }
 
         await sock.sendMessage(from, { text, mentions }, { quoted: msg });
@@ -141,7 +141,7 @@ async function nightCommand(sock, from, msg, args = []) {
 ┃
 ┃ 😴 *Sweet dreams & sleep tight!* ✨
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         } else {
             text =
 `╭━━━〔 🌙 *GOOD NIGHT / SHAB BAKHAIR* 〕━━━┈⊷
@@ -151,7 +151,7 @@ async function nightCommand(sock, from, msg, args = []) {
 ┃
 ┃ 😴 *Sweet dreams & peaceful sleep!* ✨
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         }
 
         await sock.sendMessage(from, { text, mentions }, { quoted: msg });
@@ -181,7 +181,7 @@ async function thanksCommand(sock, from, msg, args = []) {
 ┃
 ┃ 💖 *Always happy to help you!*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         } else {
             text =
 `╭━━━〔 🌸 *MOST WELCOME* 〕━━━┈⊷
@@ -191,7 +191,7 @@ async function thanksCommand(sock, from, msg, args = []) {
 ┃
 ┃ 💖 *Always here for you!*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         }
 
         await sock.sendMessage(from, { text, mentions }, { quoted: msg });
@@ -219,7 +219,7 @@ async function afternoonCommand(sock, from, msg, args = []) {
 ┃
 ┃ ${wish.replace(/\n/g, '\n┃ ')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         } else {
             text =
 `╭━━━〔 ☀️ *GOOD AFTERNOON* 〕━━━┈⊷
@@ -227,7 +227,7 @@ async function afternoonCommand(sock, from, msg, args = []) {
 ┃
 ┃ ${wish.replace(/\n/g, '\n┃ ')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         }
 
         await sock.sendMessage(from, { text, mentions }, { quoted: msg });
@@ -254,7 +254,7 @@ async function eveningCommand(sock, from, msg, args = []) {
 ┃
 ┃ ${wish.replace(/\n/g, '\n┃ ')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         } else {
             text =
 `╭━━━〔 🌆 *GOOD EVENING* 〕━━━┈⊷
@@ -262,7 +262,7 @@ async function eveningCommand(sock, from, msg, args = []) {
 ┃
 ┃ ${wish.replace(/\n/g, '\n┃ ')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
         }
 
         await sock.sendMessage(from, { text, mentions }, { quoted: msg });

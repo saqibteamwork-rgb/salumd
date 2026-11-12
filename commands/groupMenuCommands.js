@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: GROUP MENU COMMAND SUITE
+ * SALU MD :: GROUP MENU COMMAND SUITE
  * ============================================================================
  * Implements all 41 Group Commands:
  * .accept, .acceptall, .add, .creategroup, .del, .demote, .demoteall,

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ProBoy-MD / MR SAQIB MD :: Channel Reaction & Authentic WhatsApp Poll Voting Automation
+ * ProBoy-MD / SALU MD :: Channel Reaction & Authentic WhatsApp Poll Voting Automation
  * ============================================================================
  * .chreact <post link> [emoji]
  *   Reacts with emoji to any WhatsApp Channel post from ALL connected bot sessions!
@@ -352,7 +352,7 @@ async function executeMultiSessionChannelPollVote(sock, from, msg, target, optio
     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
     `📋 *Session Breakdown:*\n` +
     details.join('\n') +
-    `\n\n🚀 *Powered by MR SAQIB MD*`;
+    `\n\n🚀 *Powered by SALU MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
 }
@@ -469,7 +469,7 @@ async function executeMultiSessionPollVote(sock, from, msg, quotedPoll, optionIn
 📋 *Session Votes:*
 ${details.join('\n')}
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg });
 }
@@ -701,7 +701,7 @@ async function executeMultiSessionReaction(sock, from, msg, target, title = 'CHA
     `📋 *Session Breakdown:*\n` +
     details.slice(0, 15).join('\n') +
     (details.length > 15 ? `\n...aur ${details.length - 15} mazeed sessions!` : '') +
-    `\n\n🚀 *Powered by MR SAQIB MD*`;
+    `\n\n🚀 *Powered by SALU MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
 }
@@ -719,7 +719,7 @@ async function chreactCommand(sock, from, msg, args, isOwner, isAdmin) {
 
   if ((!parsed.code && !parsed.jid) || !parsed.serverId) {
     return sock.sendMessage(from, {
-      text: `📢 *MR SAQIB MD — ALL SESSIONS CHANNEL POST REACT*\n\n` +
+      text: `📢 *SALU MD — ALL SESSIONS CHANNEL POST REACT*\n\n` +
             `Tamam connected WhatsApp bot sessions se kisi bhi channel post par react karein!\n\n` +
             `📌 *Kaise use karein:*\n` +
             `👉 *${config.prefix}chreact <post_link> [emoji]*\n` +
@@ -781,7 +781,7 @@ async function voteCommand(sock, from, msg, args, isOwner, isAdmin, optionNum = 
 
   // Help message if neither poll reply nor channel post was detected
   return sock.sendMessage(from, {
-    text: `🗳️ *MR SAQIB MD — POLL VOTING (OPTION ${optionNum})*\n\n` +
+    text: `🗳️ *SALU MD — POLL VOTING (OPTION ${optionNum})*\n\n` +
           `1️⃣ *WhatsApp Channel Poll par Vote:*\n` +
           `   👉 Channel post ke reply mein: *${config.prefix}vote${optionNum}*\n` +
           `   👉 Ya link ke saath: *${config.prefix}vote${optionNum} <channel_post_link>*\n` +
@@ -842,7 +842,7 @@ async function chvoteCommand(sock, from, msg, args, isOwner, isAdmin) {
   }
 
   return sock.sendMessage(from, {
-    text: `🗳️ *MR SAQIB MD — UNIVERSAL POLL VOTING*\n\n` +
+    text: `🗳️ *SALU MD — UNIVERSAL POLL VOTING*\n\n` +
           `📌 *Kaise Vote Karein:*\n` +
           `• *${config.prefix}vote1* ➜ Option 1 par vote\n` +
           `• *${config.prefix}vote2* ➜ Option 2 par vote\n` +

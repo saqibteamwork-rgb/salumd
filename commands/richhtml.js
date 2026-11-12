@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Meta AI Rich HTML & GenAI Card Module
+ * SALU MD :: Meta AI Rich HTML & GenAI Card Module
  * ============================================================================
  * Commands: .richhtml / .htmlcard / .foa
  * Usage:
- *   .richhtml <h1>Hello from MR SAQIB MD</h1>
+ *   .richhtml <h1>Hello from SALU MD</h1>
  * ============================================================================
  */
 
@@ -64,7 +64,7 @@ p { color: #8696a0; font-size: 14px; line-height: 1.5; margin: 0; }
 </head>
 <body>
 <div class="card">
-  <h1>⚡ MR SAQIB MD</h1>
+  <h1>⚡ SALU MD</h1>
   <p>Meta AI GenAI HTML Card Primitive rendered live on WhatsApp!</p>
   <span class="badge">PRO VERSION</span>
 </div>

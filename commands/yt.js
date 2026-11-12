@@ -157,7 +157,7 @@ async function ytmp3Command(sock, from, msg, args = []) {
             await sock.sendMessage(from, {
                 image: { url: thumbUrl },
                 caption:
-`╭━━━〔 🎵 *MR SAQIB MD PLAYER* 〕━━━┈⊷
+`╭━━━〔 🎵 *SALU MD PLAYER* 〕━━━┈⊷
 ┃ 📌 *Title:* ${finalTitle}
 ┃ 👤 *Channel:* ${dlData.author || videoInfo.author || 'YouTube'}
 ┃ ⏱️ *Duration:* ${videoInfo.duration || 'N/A'}
@@ -252,13 +252,13 @@ async function ytmp4Command(sock, from, msg, args = []) {
 `╭━━━〔 🎬 *YOUTUBE VIDEO* 〕━━━┈⊷
 ┃ 📌 *Title:* ${finalTitle}
 ┃ 👤 *Channel:* ${dlData.author || videoInfo.author || 'YouTube'}
-┃ ⚡ *Powered by:* ${settings.botName || 'MR SAQIB MD'}
+┃ ⚡ *Powered by:* ${settings.botName || 'SALU MD'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         const adReplyContext = {
             externalAdReply: {
                 title: finalTitle,
-                body: `YouTube Video • ${settings.botName || 'MR SAQIB MD'}`,
+                body: `YouTube Video • ${settings.botName || 'SALU MD'}`,
                 thumbnailUrl: dlData.thumbnail || videoInfo.thumbnail || settings.websiteThumbnail,
                 sourceUrl: videoInfo.url,
                 mediaType: 1,

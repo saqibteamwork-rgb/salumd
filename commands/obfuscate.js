@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: JavaScript Code Obfuscator Module
+ * SALU MD :: JavaScript Code Obfuscator Module
  * ============================================================================
  * Commands: .obfuscate / .obf
  * Usage:
@@ -69,7 +69,7 @@ async function obfuscateCommand(sock, from, msg, args = []) {
 ┃ ✦ String Array Encoding (Base64/RC4)
 ┃ ✦ Anti-Tamper & Compact Protection
 ┃
-┃ 👑 *Powered by MR SAQIB MD*
+┃ 👑 *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -113,7 +113,7 @@ async function obfuscateCommand(sock, from, msg, args = []) {
 ┃ 📊 *Original Size:* ${jsCode.length} chars
 ┃ 🔐 *Obfuscated Size:* ${obfuscatedCode.length} chars
 ┃ 🟢 *Status:* Successfully Encrypted ✅
-┃ 👑 *Powered by MR SAQIB MD*
+┃ 👑 *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
             }, { quoted: msg });
         } else {
@@ -129,7 +129,7 @@ async function obfuscateCommand(sock, from, msg, args = []) {
 ${obfuscatedCode}
 \`\`\`
 
-⚡ *Powered by MR SAQIB MD*`
+⚡ *Powered by SALU MD*`
             }, { quoted: msg });
         }
 

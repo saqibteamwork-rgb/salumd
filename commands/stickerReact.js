@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Sticker Saver & Multi-Sticker Reaction Engine
+ * SALU MD :: Sticker Saver & Multi-Sticker Reaction Engine
  * ============================================================================
  * Commands:
  * - .sts <name>        : Save any quoted sticker with custom name (Personal to sender)

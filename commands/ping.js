@@ -19,16 +19,16 @@ async function pingCommand(sock, from, msg) {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: settings.newsletterJid || '120363421389121979@newsletter',
-            newsletterName: settings.botName || 'MR SAQIB MD',
+            newsletterName: settings.botName || 'SALU MD',
             serverMessageId: 1
         }
     };
 
     const text = 
-`╭━━━〔 ⚡ *${settings.botName || 'MR SAQIB MD'} SPEED* 〕━━━┈⊷
+`╭━━━〔 ⚡ *${settings.botName || 'SALU MD'} SPEED* 〕━━━┈⊷
 ┃ 🚀 *Response Speed:* ${speedMs}ms (${speedSec}s)
 ┃ 🟢 *Server Status:* Online & Active
-┃ 👑 *Owner:* ${settings.ownerName || 'MR SAQIB'}
+┃ 👑 *Owner:* ${settings.ownerName || 'SALU'}
 ┃ ⚙️ *Platform:* Node.js (${process.version})
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 

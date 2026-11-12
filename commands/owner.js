@@ -17,8 +17,8 @@ async function ownerCommand(sock, from, msg) {
     const googleSearchUrl = 'https://www.google.com/search?q=mr+saqib';
 
     const ownerText =
-`╭━━━〔 👑 *MR SAQIB — DEVELOPER* 〕━━━┈⊷
-┃ 👤 *Name:* Muhammad Saqib
+`╭━━━〔 👑 *SALU — DEVELOPER* 〕━━━┈⊷
+┃ 👤 *Name:* SALU
 ┃ 🎂 *Age:* 17 Years Old
 ┃ 📍 *City:* Faisalabad, Pakistan 🇵🇰
 ┃ 💻 *Role:* Cyber Security & Full-Stack Dev
@@ -30,9 +30,6 @@ async function ownerCommand(sock, from, msg) {
 🌐 *Official Website:*
 ${websiteUrl}
 
-🔍 *Search on Google:*
-${googleSearchUrl}
-
 💬 *Direct WhatsApp Chat:*
 https://wa.me/${rawNumber}
 
@@ -43,29 +40,31 @@ ${formattedNumber}
 .menu
 
 ───────────────────────
-🚀 *Crafted with ❤️ by MR SAQIB*`;
+🚀 *Crafted with ❤️ by SALU*`;
 
     const channelContext = {
         forwardingScore: 999,
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: settings.newsletterJid || '120363421389121979@newsletter',
-            newsletterName: settings.botName || 'MR SAQIB MD',
+            newsletterName: settings.botName || 'SALU MD',
             serverMessageId: 1
         }
     };
 
     let imagePayload = null;
-    const localImgPath = path.join(__dirname, '..', 'data', 'mrsaqib_preview.png');
-    if (fs.existsSync(localImgPath)) {
-        try { imagePayload = fs.readFileSync(localImgPath); } catch {}
-    }
-    if (!imagePayload && settings.menuImage) {
+    if (settings.menuImage && settings.menuImage.trim() !== '') {
         const trimmed = settings.menuImage.trim();
         if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
             imagePayload = { url: trimmed };
         } else if (fs.existsSync(trimmed)) {
             imagePayload = fs.readFileSync(trimmed);
+        }
+    }
+    if (!imagePayload) {
+        const localImgPath = path.join(__dirname, '..', 'data', 'mrsaqib_preview.png');
+        if (fs.existsSync(localImgPath)) {
+            try { imagePayload = fs.readFileSync(localImgPath); } catch {}
         }
     }
 

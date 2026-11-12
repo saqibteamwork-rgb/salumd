@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ProBoy-MD / MR SAQIB MD :: SMD-Mini Aesthetic Menu Engine
+ * ProBoy-MD / SALU MD :: SMD-Mini Aesthetic Menu Engine
  * ============================================================================
  * Ultra-clean SMD-Mini theme with Bold Sans & Italic typography requested by user:
  * ╭━━━〔 ⚡ 𝗠𝗥 𝗦𝗔𝗤𝗜𝗕 𝗠𝗗 ⚡ 〕━━━┈⊷
@@ -198,9 +198,9 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
 
     // 2. Build Bold & Italic Aesthetic Header Box
     let menuText = 
-`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'MR SAQIB MD')} ⚡ 〕━━━┈⊷
+`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'SALU MD')} ⚡ 〕━━━┈⊷
 ┃ 👤 ${toSansBold('User')}: _${customName}_
-┃ 👑 ${toSansBold('Owner')}: ${toSansBold(settings.ownerName || 'MR SAQIB')}
+┃ 👑 ${toSansBold('Owner')}: ${toSansBold(settings.ownerName || 'SALU')}
 ┃ 🟢 ${toSansBold('Status')}: ${toSansBold('Connected')} 🟢
 ┃ ⚙️ ${toSansBold('System')}: ${toSansBold('Active')} ⚡
 ┃ 🌐 ${toSansBold('Server')}: ${toSansBold('Running')} 🚀
@@ -225,7 +225,7 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
     // 4. Build Powered By Footer
     menuText += 
 `╭━━━〔 👑 ${toSansBold('POWERED BY')} 〕━━━┈⊷
-┃ 🚀 ${toSansBold(settings.ownerName || 'MR SAQIB')}
+┃ 🚀 ${toSansBold(settings.ownerName || 'SALU')}
 ┃ 🔍 google.com/search?q=mr+saqib
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
@@ -235,23 +235,25 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
             newsletterJid: settings.newsletterJid || '120363421389121979@newsletter',
-            newsletterName: settings.botName || 'MR SAQIB MD',
+            newsletterName: settings.botName || 'SALU MD',
             serverMessageId: 1
         }
     };
 
     // 6. Image payload
     let imagePayload = null;
-    const localImgPath = path.join(__dirname, '..', 'data', 'mrsaqib_preview.png');
-    if (fs.existsSync(localImgPath)) {
-        try { imagePayload = fs.readFileSync(localImgPath); } catch {}
-    }
-    if (!imagePayload && settings.menuImage && settings.menuImage.trim() !== '') {
+    if (settings.menuImage && settings.menuImage.trim() !== '') {
         const imgPath = settings.menuImage.trim();
         if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
             imagePayload = { url: imgPath };
         } else if (fs.existsSync(imgPath)) {
             imagePayload = fs.readFileSync(imgPath);
+        }
+    }
+    if (!imagePayload) {
+        const localImgPath = path.join(__dirname, '..', 'data', 'mrsaqib_preview.png');
+        if (fs.existsSync(localImgPath)) {
+            try { imagePayload = fs.readFileSync(localImgPath); } catch {}
         }
     }
 
@@ -267,18 +269,6 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
         await sock.sendMessage(from, { text: menuText.trim() }, { quoted: msg }).catch(() => {});
     }
 
-    // 8. Send Google Search Link as a separate message so WhatsApp Mobile renders it 100% blue and clickable!
-    try {
-        const linksCard = 
-`╭━━━〔 🔍 *SEARCH ON GOOGLE* 〕━━━┈⊷
-┃ 🚀 *Mr Saqib:*
-┃ google.com/search?q=mr+saqib
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
-
-        await sock.sendMessage(from, { text: linksCard }, { quoted: msg });
-    } catch (e) {
-        console.error('[menuCommand] Error sending links card:', e.message);
-    }
 }
 
 module.exports = {

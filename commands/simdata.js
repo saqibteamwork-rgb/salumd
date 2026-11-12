@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Pakistani SIM & CNIC Live Database Lookup
+ * SALU MD :: Pakistani SIM & CNIC Live Database Lookup
  * ============================================================================
  * Commands: .sim / .simdata / .cnic
  * Usage:
@@ -55,7 +55,7 @@ async function simdataCommand(sock, from, msg, args = []) {
 ┃ • Phone: 03XX-XXXXXXX ya 03XXXXXXXXX
 ┃ • CNIC: 13 Digits (Dashes ke sath ya baghair)
 ┃
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -125,7 +125,7 @@ async function simdataCommand(sock, from, msg, args = []) {
 `╭━━━〔 ⚡ ${toSansBold('SIM DATABASE RESULTS')} ⚡ 〕━━━┈⊷
 ┃ 🔍 *Queried:* \`${queryValue}\`
 ┃ 📊 *Records Found:* ${records.length}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n`;
 
         records.forEach((rec, idx) => {
@@ -142,7 +142,7 @@ async function simdataCommand(sock, from, msg, args = []) {
             resultText += `╰────────────────────────┈⊷`;
         });
 
-        resultText += `\n\n⚡ *Powered by MR SAQIB MD*`;
+        resultText += `\n\n⚡ *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text: resultText }, { quoted: msg });
 

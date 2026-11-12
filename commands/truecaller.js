@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Truecaller Caller ID Lookup
+ * SALU MD :: Truecaller Caller ID Lookup
  * ============================================================================
  * Commands: .tc / .truecaller / .callerid
  * Usage:
@@ -34,7 +34,7 @@ async function truecallerCommand(sock, from, msg, args = []) {
 ┃ 👉 *.tc 03367402299*
 ┃ 👉 *.truecaller +923367402299*
 ┃
-┃ 🛡️ *Powered by MR SAQIB MD*
+┃ 🛡️ *Powered by SALU MD*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -97,7 +97,7 @@ async function truecallerCommand(sock, from, msg, args = []) {
 ┃ 📞 *Number:* \`${tcPhone}\`
 ┃ 📡 *Carrier:* ${carrier}
 ┃ 📧 *Email:* ${email}
-┃ 👑 *Bot:* ${toSansBold(settings.botName || 'MR SAQIB MD')}
+┃ 👑 *Bot:* ${toSansBold(settings.botName || 'SALU MD')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         await sock.sendMessage(from, { text: cardText }, { quoted: msg });

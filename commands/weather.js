@@ -38,7 +38,7 @@ async function weatherCommand(sock, chatId, msg) {
                         `💨 *Wind:* ${data.wind?.speed ?? 'N/A'} m/s\n` +
                         `☁️ *Condition:* ${description}\n` +
                         `🔽 *Pressure:* ${data.main.pressure} hPa\n\n` +
-                        `🚀 _${settings.botName || 'MR SAQIB MD'}_`;
+                        `🚀 _${settings.botName || 'SALU MD'}_`;
 
                     return await sock.sendMessage(chatId, { text }, { quoted: msg });
                 }
@@ -69,7 +69,7 @@ async function weatherCommand(sock, chatId, msg) {
 ┃ 👁️ *Visibility:* ${current.visibility} km
 ┃ 🔽 *Pressure:* ${current.pressure} mb
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *${settings.botName || 'MR SAQIB MD'}*`;
+🚀 *${settings.botName || 'SALU MD'}*`;
 
             return await sock.sendMessage(chatId, { text }, { quoted: msg });
         }

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Voice Mimic & Mirror Engine (.mt)
+ * SALU MD :: Voice Mimic & Mirror Engine (.mt)
  * ============================================================================
  * Features:
  * - .mt                : Replies to any voice note or audio, and sends the EXACT

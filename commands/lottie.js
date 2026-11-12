@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: WhatsApp Animated Lottie / Avatar / Custom Sticker Reaction Module
+ * SALU MD :: WhatsApp Animated Lottie / Avatar / Custom Sticker Reaction Module
  * ============================================================================
  * Features:
  * - .was / .lottie / .asticker / .avatar :

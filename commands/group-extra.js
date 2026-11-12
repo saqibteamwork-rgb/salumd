@@ -180,7 +180,7 @@ async function welcomeCommand(sock, from, msg, isAdmin, botData, saveBotData, ar
 👥 *Member:* #${memberCount}
 📜 *Rules:* Follow the group rules and have fun!
 
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
             const mentionJids = [...new Set([phoneJid, senderJid, cleanJid = `${rawNumber}@s.whatsapp.net`])].filter(Boolean);
 
@@ -303,7 +303,7 @@ async function goodbyeCommand(sock, from, msg, isAdmin, botData, saveBotData, ar
 👋 *Goodbye* ${userTag}!
 We will miss you in *${groupSubject}*!
 
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
             await sock.sendMessage(from, {
                 image: cardBuffer,
@@ -414,7 +414,7 @@ async function handleGroupParticipantsUpdate(sock, update, botData) {
 👥 *Member:* #${memberCount}
 📜 *Rules:* Follow the group rules and respect members!
 
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
                     const mentionJids = [...new Set([phoneJid, lidJid, rawJid])].filter(Boolean);
 
@@ -447,7 +447,7 @@ async function handleGroupParticipantsUpdate(sock, update, botData) {
 👋 *Goodbye* ${tag}!
 We will miss you in *${groupSubject}*!
 
-⚡ *Powered by MR SAQIB MD*`;
+⚡ *Powered by SALU MD*`;
 
                     const mentionJids = [...new Set([phoneJid, lidJid, rawJid])].filter(Boolean);
 
@@ -644,7 +644,7 @@ async function onlineCommand(sock, from, msg) {
 ┃ 🛡️ *Restrict:* ${metadata.restrict ? 'Admins Only' : 'Everyone'}
 ┃ 💬 *Announce:* ${metadata.announce ? 'Only Admins Can Send' : 'All Members Can Send'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text }, { quoted: msg });
     } catch (e) {

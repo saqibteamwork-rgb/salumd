@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Extended Utility & Power Tools Suite
+ * SALU MD :: Extended Utility & Power Tools Suite
  * ============================================================================
  * Commands:
  * - .define <word>       : English dictionary definitions & synonyms
@@ -56,7 +56,7 @@ async function defineCommand(sock, from, msg, args = []) {
 
 ${meaningsText.trim()}
 
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text: caption }, { quoted: msg });
     } catch (e) {
@@ -173,7 +173,7 @@ async function pastebinCommand(sock, from, msg, args = []) {
 ┃ ${pasteUrl}
 ┃ 📊 *Length:* ${text.length} characters
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text: out }, { quoted: msg });
     } catch (e) {
@@ -234,7 +234,7 @@ async function getcidCommand(sock, from, msg, args = []) {
 ┃ 🛡️ *Verified:* ${metadata.verification === 'VERIFIED' ? 'Yes ✅' : 'No ❌'}
 ┃ 🔗 *Invite Code:* ${code}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text: out }, { quoted: msg });
     } catch (e) {

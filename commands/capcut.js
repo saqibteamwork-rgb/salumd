@@ -42,7 +42,7 @@ async function capcutCommand(sock, from, msg, args = []) {
 `╭━━━〔 🎬 *CAPCUT VIDEO* 〕━━━┈⊷
 ┃ 📌 *Title:* ${title}
 ┃ 👤 *Author:* ${author}
-┃ ⚡ *Powered by:* ${settings.botName || 'MR SAQIB MD'}
+┃ ⚡ *Powered by:* ${settings.botName || 'SALU MD'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
 
         await sock.sendMessage(from, {

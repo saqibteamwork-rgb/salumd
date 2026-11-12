@@ -63,7 +63,7 @@ async function wameCommand(sock, from, msg, args) {
 ┃ 🌐 *Link:* ${waLink}
 ${customText ? `┃ 💬 *Pre-filled Message:* ${customText}\n` : ''}╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, {
             text: caption,
@@ -72,7 +72,7 @@ ${customText ? `┃ 💬 *Pre-filled Message:* ${customText}\n` : ''}╰━━�
                     title: `Chat with +${phone}`,
                     body: "Click to open WhatsApp direct chat",
                     mediaType: 1,
-                    thumbnailUrl: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_7oG52NZUY.png",
+                    thumbnailUrl: settings.menuImage || "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp",
                     sourceUrl: waLink,
                     renderLargerThumbnail: false
                 }
@@ -111,7 +111,7 @@ async function grouplinkCommand(sock, from, msg, isOwner, isAdmin) {
 ┃ 👤 *Requested by:* @${senderJid.split('@')[0]}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, {
             text,
@@ -121,7 +121,7 @@ async function grouplinkCommand(sock, from, msg, isOwner, isAdmin) {
                     title: "Group Invite Link",
                     body: "Click to join this WhatsApp Group",
                     mediaType: 1,
-                    thumbnailUrl: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_7oG52NZUY.png",
+                    thumbnailUrl: settings.menuImage || "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp",
                     sourceUrl: groupLink,
                     renderLargerThumbnail: false
                 }
@@ -169,7 +169,7 @@ async function listadminsCommand(sock, from, msg) {
             listText += `┃ ${i + 1}. @${jid.split('@')[0]} (${role})\n`;
         }
 
-        listText += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n🚀 *Powered by MR SAQIB MD*`;
+        listText += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, {
             text: listText,
@@ -197,9 +197,9 @@ async function aliveCommand(sock, from, msg, sessions, BOT_START_TIME) {
         const latency = Math.max(0, Date.now() - msgTimestamp);
 
         const caption = 
-`╭━━━〔 ⚡ *MR SAQIB MD IS ALIVE* 〕━━━┈⊷
-┃ 🤖 *Bot Name:* MR SAQIB MD
-┃ 👑 *Owner:* MR SAQIB
+`╭━━━〔 ⚡ *SALU MD IS ALIVE* 〕━━━┈⊷
+┃ 🤖 *Bot Name:* SALU MD
+┃ 👑 *Owner:* SALU
 ┃ ⏱️ *Uptime:* ${uptimeStr}
 ┃ 📡 *Active Sessions:* ${activeCount} / ${totalCount}
 ┃ ⚡ *Speed:* ${latency}ms
@@ -212,14 +212,14 @@ https://whatsapp.com/channel/0029VbBTSK1EquiWrUt5uV1I
 🚀 *Fastest & Most Advanced Multi-Device WhatsApp Bot*`;
 
         await sock.sendMessage(from, {
-            image: { url: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_7oG52NZUY.png" },
+            image: { url: settings.menuImage || "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp" },
             caption: caption,
             contextInfo: {
                 forwardingScore: 999,
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: '120363421389121979@newsletter',
-                    newsletterName: 'MR SAQIB MD',
+                    newsletterName: 'SALU MD',
                     serverMessageId: -1
                 }
             }
@@ -227,7 +227,7 @@ https://whatsapp.com/channel/0029VbBTSK1EquiWrUt5uV1I
 
     } catch (e) {
         console.error('[Alive Command Error]:', e);
-        await sock.sendMessage(from, { text: `⚡ *MR SAQIB MD is Online!* (Uptime: ${formatUptime(Math.floor((Date.now() - BOT_START_TIME) / 1000))})` }, { quoted: msg });
+        await sock.sendMessage(from, { text: `⚡ *SALU MD is Online!* (Uptime: ${formatUptime(Math.floor((Date.now() - BOT_START_TIME) / 1000))})` }, { quoted: msg });
     }
 }
 
@@ -244,7 +244,7 @@ async function quoteCommand(sock, from, msg) {
 ┃ ✍️ — *${data.author}*
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 
-🚀 *Powered by MR SAQIB MD*`;
+🚀 *Powered by SALU MD*`;
 
         await sock.sendMessage(from, { text }, { quoted: msg });
     } catch (e) {

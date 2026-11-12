@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Device & Group Security Testing / Bug Stanzas
+ * SALU MD :: Device & Group Security Testing / Bug Stanzas
  * ============================================================================
  * Commands: .crashgrup / .iosbug / .blank
  * Access: Restricted strictly to Bot Owner

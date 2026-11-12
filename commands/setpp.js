@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ProBoy-MD / MR SAQIB MD :: Full DP & Group DP Module
+ * ProBoy-MD / SALU MD :: Full DP & Group DP Module
  * ============================================================================
  * Features:
  * - .setpp  : Set bot profile picture (100% Full Edge-to-Edge HD, zero sidebars)
@@ -272,12 +272,12 @@ async function setppCommand(sock, from, msg, isOwner, args = []) {
         await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
 
         const responseText = 
-`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'MR SAQIB MD')} ⚡ 〕━━━┈⊷
+`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'SALU MD')} ⚡ 〕━━━┈⊷
 ┃ 🖼️ *Profile Picture Updated!*
 ┃ 📏 *Style:* ${processed.mode}
 ┃ 📐 *Size:* 720 × 720 Full HD
 ┃ 📱 *Account:* +${acctNum}
-┃ 👑 *Set By:* ${toSansBold(settings.ownerName || 'MR SAQIB')}
+┃ 👑 *Set By:* ${toSansBold(settings.ownerName || 'SALU')}
 ┃ 🟢 *Status:* DP Sirf Iss Number Par Set Ho Gayi ✅
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
 💡 _Dusre kisi user ya session ki profile picture change nahi hui._`;
@@ -379,7 +379,7 @@ async function setgppCommand(sock, from, msg, isAdmin, isOwner, args = []) {
         await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
 
         const responseText = 
-`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'MR SAQIB MD')} ⚡ 〕━━━┈⊷
+`╭━━━〔 ⚡ ${toSansBold(settings.botName || 'SALU MD')} ⚡ 〕━━━┈⊷
 ┃ 👥 *Group DP Updated!*
 ┃ 🏷️ *Group:* ${groupMetadata.subject || 'Group'}
 ┃ 📏 *Style:* ${processed.mode}

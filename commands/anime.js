@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: Anime Suite
+ * SALU MD :: Anime Suite
  * ============================================================================
  * Commands:
  * - .waifu      : Random waifu image
@@ -37,7 +37,7 @@ async function waifuCommand(sock, from, msg) {
 ┃ 👤 *Artist:* ${item.artist_name || 'Unknown'}
 ┃ 🎨 *Source:* ${item.source_url ? item.source_url.slice(0, 30) + '...' : 'nekos.best'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, {
             image: { url: item.url },
@@ -60,7 +60,7 @@ async function nekoCommand(sock, from, msg) {
 ┃ 👤 *Artist:* ${item.artist_name || 'Unknown'}
 ┃ 🎨 *Source:* ${item.source_url ? item.source_url.slice(0, 30) + '...' : 'nekos.best'}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, {
             image: { url: item.url },
@@ -82,7 +82,7 @@ async function animeQuoteCommand(sock, from, msg) {
 ┃ 👤 *Character:* ${pick.character}
 ┃ 🎬 *Anime:* ${pick.anime}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         await sock.sendMessage(from, { text }, { quoted: msg });
     } catch (e) {
@@ -126,7 +126,7 @@ async function animeSearchCommand(sock, from, msg, args = []) {
 ┃ 📖 *Synopsis:*
 ┃ ${synopsis}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷
-🚀 *MR SAQIB MD*`;
+🚀 *SALU MD*`;
 
         if (poster) {
             await sock.sendMessage(from, { image: { url: poster }, caption: text }, { quoted: msg });

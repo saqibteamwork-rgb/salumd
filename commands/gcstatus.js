@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MR SAQIB MD :: GROUP STATUS SENDER (.gcstatus / .groupstatus)
+ * SALU MD :: GROUP STATUS SENDER (.gcstatus / .groupstatus)
  * ============================================================================
  * Posts media (Image, Video, Audio) or text as a Group Status Mention
  * to notify all members in the group.
