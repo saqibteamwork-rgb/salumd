@@ -1,9 +1,10 @@
-// ✅ Coded by JawadTechX for JAWAD MD
-// ⚙️ API: https://jawad-tech.vercel.app/download/ytdl?url=
+// plugins/ytdl-ultra.js
+'use strict';
 
 const { cmd } = require('../command');
 const yts = require('yt-search');
 const axios = require('axios');
+const { ytdlAuto } = require('../lib/ytdlScraper');
 
 cmd({
     pattern: "ytv",
@@ -16,54 +17,61 @@ cmd({
     try {
         if (!q) return await reply("🎥 Please provide a YouTube video name or URL!\n\nExample: `.ytv alone marshmello`");
 
-        let url = q;
+        let url = q.trim();
         let videoInfo = null;
 
-        // 🔍 Detect URL or search by title
-        if (q.startsWith('http://') || q.startsWith('https://')) {
-            if (!q.includes("youtube.com") && !q.includes("youtu.be")) {
-                return await reply("❌ Please provide a valid YouTube URL!");
-            }
-            const videoId = getVideoId(q);
-            if (!videoId) return await reply("❌ Invalid YouTube URL!");
-            const searchFromUrl = await yts({ videoId });
-            videoInfo = searchFromUrl;
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            const search = await yts({ videoId: getVideoId(url) });
+            videoInfo = search || { title: 'YouTube Video', url };
         } else {
-            const search = await yts(q);
+            const search = await yts(url);
             videoInfo = search.videos[0];
             if (!videoInfo) return await reply("❌ No video results found!");
             url = videoInfo.url;
         }
 
-        // 🎯 Extract YouTube video ID
-        function getVideoId(url) {
-            const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+        function getVideoId(u) {
+            const match = u.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
             return match ? match[1] : null;
         }
 
-        // 🖼️ Send thumbnail + video info
-        await conn.sendMessage(from, {
-            image: { url: videoInfo.thumbnail },
-            caption: `*🎬 VIDEO DOWNLOADER*\n\n🎞️ *Title:* ${videoInfo.title}\n📺 *Channel:* ${videoInfo.author.name}\n🕒 *Duration:* ${videoInfo.timestamp}\n\n*Status:* Downloading Video...\n\n*© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝙏𝙚𝙘𝙝𝙓 𝙈𝘿*`
-        }, { quoted: mek });
+        await conn.sendMessage(from, { react: { text: '⏳', key: m.key } }).catch(() => {});
 
-        // ⚙️ Fetch from JawadTech API
-        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(url)}`;
-        const { data } = await axios.get(apiUrl);
-
-        if (!data?.status || !data?.result?.mp4) {
-            return await reply("❌ Failed to fetch download link! Try again later.");
+        const res = await ytdlAuto(url, '360');
+        if (!res || !res.status || !res.download_url) {
+            return await reply("❌ Failed to fetch video download link! Try again later.");
         }
 
-        const vid = data.result;
+        const caption = `🎬 *${videoInfo.title || res.title || 'YouTube Video'}*\n\n> *Powered by SALU MD ✅*`;
 
-        // 📹 Send as video
-        await conn.sendMessage(from, {
-            video: { url: vid.mp4 },
-            caption: `🎬 *${vid.title}*\n\n*© ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝙏𝙝𝙚 𝙏𝙚𝙘𝙝𝙓*`
-        }, { quoted: mek });
+        // Direct buffer fetch with timeout
+        let sent = false;
+        try {
+            const vidRes = await axios.get(res.download_url, {
+                responseType: 'arraybuffer',
+                timeout: 75000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            if (vidRes.data && vidRes.data.length > 1000) {
+                await conn.sendMessage(from, {
+                    video: Buffer.from(vidRes.data),
+                    mimetype: 'video/mp4',
+                    caption
+                }, { quoted: mek });
+                sent = true;
+            }
+        } catch (bufErr) {
+            console.warn('[Plugin ytv Buffer Warning]:', bufErr.message);
+        }
 
-        // ✅ Success Reaction
+        if (!sent) {
+            await conn.sendMessage(from, {
+                video: { url: res.download_url },
+                mimetype: 'video/mp4',
+                caption
+            }, { quoted: mek });
+        }
+
         await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
 
     } catch (e) {
@@ -73,12 +81,10 @@ cmd({
     }
 });
 
-
-// jawad tech
-
 cmd({
     pattern: "play",
-    desc: "Download YouTube audio with thumbnail (Your API)",
+    alias: ["song", "ytmp3"],
+    desc: "Download YouTube audio with thumbnail",
     category: "download",
     react: "🎶",
     filename: __filename
@@ -86,48 +92,67 @@ cmd({
     try {
         if (!q) return await reply("🎧 Please provide a song name!\n\nExample: .play Faded Alan Walker");
 
-        const { videos } = await yts(q);
-        if (!videos || videos.length === 0) return await reply("❌ No results found!");
+        await conn.sendMessage(from, { react: { text: '⚡', key: m.key } }).catch(() => {});
 
-        const vid = videos[0];
-        const videoUrl = vid.url;
+        let videoUrl = q.trim();
+        let vid = null;
 
-        // 🎵 Send thumbnail + info first
-        await conn.sendMessage(from, {
-            image: { url: vid.thumbnail },
-            caption: `- *AUDIO DOWNLOADER 🎧*\n╭━━❐━⪼\n┇๏ *Title* - ${vid.title}\n┇๏ *Duration* - ${vid.timestamp}\n┇๏ *Views* - ${vid.views.toLocaleString()}\n┇๏ *Author* - ${vid.author.name}\n┇๏ *Status* - Downloading...\n╰━━❑━⪼\n> *© Pᴏᴡᴇʀᴇᴅ Bʏ SALU MD*`
-        }, { quoted: mek });
+        if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
+            vid = { url: videoUrl, title: 'YouTube Audio', timestamp: 'N/A', author: { name: 'YouTube' } };
+        } else {
+            const search = await yts(videoUrl);
+            if (!search.videos || search.videos.length === 0) return await reply("❌ No results found!");
+            vid = search.videos[0];
+            videoUrl = vid.url;
+        }
 
-        // === Your API ===
-        const apiUrl = `https://adeelmdmp3.vercel.app/download?url=${encodeURIComponent(videoUrl)}&key=adeelbaloch.dev`;
+        // Send thumbnail card
+        if (vid.thumbnail) {
+            await conn.sendMessage(from, {
+                image: { url: vid.thumbnail },
+                caption: `- *AUDIO DOWNLOADER 🎧*\n╭━━❐━⪼\n┇๏ *Title* - ${vid.title}\n┇๏ *Duration* - ${vid.timestamp || 'N/A'}\n┇๏ *Author* - ${vid.author?.name || 'YouTube'}\n┇๏ *Status* - Downloading...\n╰━━❑━⪼\n> *© Powered by SALU MD*`
+            }, { quoted: mek }).catch(() => {});
+        }
 
-        let audioUrl = null;
-        let title = vid.title || "Unknown Song";
+        // Multi-tier ytdlAuto (ytdl-lite + savetube.vip + savenow)
+        const res = await ytdlAuto(videoUrl, 'mp3');
+        if (!res || !res.status || !res.download_url) {
+            return await reply("❌ Download link generate nahi hua. Thori der baad dobara koshish karein!");
+        }
 
+        const cleanTitle = (vid.title || res.title || 'song').replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
+
+        // Download audio buffer
+        let audioBuffer = null;
         try {
-            const res = await axios.get(apiUrl, { timeout: 30000 }); // Increased timeout
-            const json = res.data;
-
-            if (json?.status === true && json?.result) {
-                audioUrl = typeof json.result === 'string' 
-                    ? json.result 
-                    : json.result.download || json.result.url || json.result.link;
+            const aRes = await axios.get(res.download_url, {
+                responseType: 'arraybuffer',
+                timeout: 75000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            if (aRes.data && aRes.data.length > 1000) {
+                audioBuffer = Buffer.from(aRes.data);
             }
-        } catch (err) {
-            console.log("Your API Error:", err.message);
+        } catch (bufErr) {
+            console.warn('[Plugin Play Buffer Warning]:', bufErr.message);
         }
 
-        if (!audioUrl) {
-            return await reply("❌ API se audio nahi mila. Thori der baad try karen!");
+        // Send Playable Audio with proper 'audio/mpeg'
+        if (audioBuffer && audioBuffer.length > 0) {
+            await conn.sendMessage(from, {
+                audio: audioBuffer,
+                mimetype: "audio/mpeg",
+                fileName: `${cleanTitle}.mp3`,
+                ptt: false
+            }, { quoted: mek });
+        } else {
+            await conn.sendMessage(from, {
+                audio: { url: res.download_url },
+                mimetype: "audio/mpeg",
+                fileName: `${cleanTitle}.mp3`,
+                ptt: false
+            }, { quoted: mek });
         }
-
-        // 🎧 Send audio
-        await conn.sendMessage(from, {
-            audio: { url: audioUrl },
-            mimetype: "audio/mp4",
-            fileName: `${title}.mp3`,
-            ptt: false
-        }, { quoted: mek });
 
         await conn.sendMessage(from, { react: { text: '✅', key: m.key } });
 
