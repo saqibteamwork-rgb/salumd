@@ -2012,7 +2012,7 @@ server.on('error', (err) => {
         console.error('⚠️ Server error:', err.message);
     }
 });
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log('\n' +
     '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n' +
     '   ⚡ ' + settings.botName + ' — SERVER ⚡\n' +

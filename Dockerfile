@@ -16,9 +16,5 @@ RUN npm install
 # Copy application source code
 COPY . .
 
-# Expose web server port (Railway sets $PORT dynamically)
-ENV PORT=20168
-EXPOSE 20168
-
 # Start the bot
 CMD ["npm", "start"]
