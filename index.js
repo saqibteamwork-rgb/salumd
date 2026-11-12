@@ -803,19 +803,16 @@ class BotSession {
 
     startActiveCheck() {
         if (this.activeInterval) clearInterval(this.activeInterval);
-        // High-frequency presence heartbeat (every 45s) keeps WhatsApp WebSocket alive 24/7 without idle timeout
+        // Regular gentle presence update keeps WebSocket healthy without triggering rate limits
         this.activeInterval = setInterval(async () => {
             if (this.isConnected && this.sock?.user) {
                 try {
                     await this.sock.sendPresenceUpdate('available');
                 } catch (e) {
-                    if (this.sock?.ws && this.sock.ws.readyState !== 1) {
-                        this.sendLog("⚠️ WebSocket connection dropped, reconnecting...", "warning");
-                        try { this.sock.end(new Error('Heartbeat timeout')); } catch {}
-                    }
+                    // Do not forcefully terminate socket on temporary presence update failure
                 }
             }
-        }, 45 * 1000);
+        }, 60 * 1000);
     }
 
     async initialize(pairingNumber = null) {
@@ -825,6 +822,16 @@ class BotSession {
         }
         this.isInitializing = true;
         try {
+            // Clean up any stale socket to prevent duplicate connections and code 500 conflicts
+            if (this.sock) {
+                try {
+                    this.sock.ev.removeAllListeners();
+                    if (this.sock.ws && this.sock.ws.readyState === 1) {
+                        this.sock.ws.close();
+                    }
+                } catch (e) {}
+            }
+
             if (pairingNumber) {
                 pairingNumber = String(pairingNumber).replace(/[^0-9]/g, '');
                 // Ensure completely clean auth folder for fresh pairing code generation
@@ -1928,19 +1935,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                         console.error('[channelHub] session init error:', e.message);
                     }
 
-                    // Safely send welcome message after phone finishes initial sync (10s delay)
-                    setTimeout(async () => {
-                        try {
-                            if (this.isConnected && this.sock?.user) {
-                                if (!this.lastConnectMessageTime || (Date.now() - this.lastConnectMessageTime > 60 * 60 * 1000)) {
-                                    await this.sock.sendMessage(botNumber, { text: STYLISH.connected });
-                                    this.lastConnectMessageTime = Date.now();
-                                }
-                            }
-                        } catch (e) {
-                            console.log('[Notice] Welcome message skipped:', e.message);
-                        }
-                    }, 10000);
+                    // Session connected silently without spamming WhatsApp chats with automated status messages
+                    this.sendLog("🤖 Bot session fully active and monitoring silently.", "success");
                 }
             });
     }
@@ -2155,13 +2151,13 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
             for (const target of uniqueTargets) {
                 try {
                     await axios.get(target, {
-                        timeout: 12000,
+                        timeout: 10000,
                         headers: { 'User-Agent': 'AntiSleep-KeepAlive/2.0' }
                     });
                 } catch (e) {}
             }
             console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲 (Keep-Alive Sent)');
-        }, 2 * 60 * 1000); // High-frequency ping every 2 minutes to prevent cloud sleeping!
+        }, 60 * 1000); // High-frequency ping every 60 seconds prevents cloud sleeping 24/7!
 
         // Periodic Memory Trimmer (Runs every 5 mins to prevent memory leaks and lag)
         setInterval(() => {
