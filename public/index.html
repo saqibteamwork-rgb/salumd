@@ -448,30 +448,30 @@
         </div>
       </article>
 
-      <!-- CARD 3: HOST SYSTEM OS (Explicit Windows Environment) -->
+      <!-- CARD 3: DEVICE OS & PLATFORM (Dynamic per-device detection) -->
       <article class="glass-slab p-3.5 sm:p-4 flex flex-col justify-between min-h-[140px]">
         <div class="flex items-center justify-between">
-          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #f0f9ff 0%, #bae6fd 70%, #7dd3fc 100%);">
-            <i class="fa-brands fa-windows text-sky-600 text-sm"></i>
+          <div class="icon-orb" style="background: radial-gradient(circle at 30% 25%, #f5f3ff 0%, #ddd6fe 70%, #c4b5fd 100%);">
+            <i id="deviceOsIcon" class="fa-solid fa-laptop text-indigo-700 text-sm"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
-            Host System
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200">
+            Device OS
           </span>
         </div>
 
         <div class="flex items-end justify-between mt-2">
-          <div>
-            <div class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-none flex items-center gap-1.5">
-              <span>Windows</span>
+          <div class="min-w-0 pr-1">
+            <div id="cardOsDisplay" class="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-none truncate">
+              Detecting...
             </div>
-            <div class="text-[10px] font-semibold text-slate-500 mt-1">
-              Node 22 · 131 Plugins
+            <div id="cardBrowserDisplay" class="text-[10px] font-bold text-slate-500 mt-1 truncate">
+              Device Info
             </div>
           </div>
 
           <div class="gauge-well-mini">
             <div class="gauge-core-mini">
-              <i class="fa-solid fa-microchip text-indigo-600 text-sm"></i>
+              <i id="devicePlatformIcon" class="fa-solid fa-shield-halved text-indigo-600 text-sm"></i>
             </div>
           </div>
         </div>
@@ -544,7 +544,7 @@
         <!-- Item 2: System / Host OS -->
         <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
           <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-xs flex-shrink-0">
-            <i class="fa-brands fa-windows"></i>
+            <i id="bApiOsIcon" class="fa-brands fa-windows"></i>
           </div>
           <div class="min-w-0">
             <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">System OS</div>
@@ -1028,91 +1028,121 @@
       const locEl1 = document.getElementById('ipCityDisplay');
       const locEl2 = document.getElementById('bApiLocation');
 
-      try {
-        const res = await fetch('https://ipwho.is/');
-        const data = await res.json();
-        if (data && data.ip) {
-          const ip = data.ip;
-          const loc = `${data.city || 'Islamabad'}, ${data.country_code || data.country || 'PK'}`;
-          if (ipEl1) ipEl1.textContent = ip;
-          if (ipEl2) ipEl2.textContent = ip;
+      function updateIpUI(ip, loc) {
+        if (!ip || ip === '127.0.0.1' || ip === '::1') return false;
+        if (ipEl1) ipEl1.textContent = ip;
+        if (ipEl2) ipEl2.textContent = ip;
+        if (loc) {
           if (locEl1) locEl1.textContent = loc;
           if (locEl2) locEl2.textContent = loc;
+        }
+        return true;
+      }
+
+      // Try ipify first (instant, high availability, no CORS issues)
+      try {
+        const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+        const data = await res.json();
+        if (data && data.ip) {
+          updateIpUI(data.ip, 'Pakistan · Online');
+        }
+      } catch (e) {}
+
+      // Try ipwho.is for accurate city and country
+      try {
+        const res = await fetch('https://ipwho.is/', { cache: 'no-store' });
+        const data = await res.json();
+        if (data && (data.ip || data.success)) {
+          const loc = `${data.city || 'Islamabad'}, ${data.country_code || data.country || 'PK'}`;
+          updateIpUI(data.ip, loc);
           return;
         }
       } catch (e) {}
 
-      // Fallback 1: api.ipify.org
+      // Try local/host backend /api/ip
       try {
-        const res = await fetch('https://api.ipify.org?format=json');
+        const res = await fetch((API_BASE || '') + '/api/ip', { cache: 'no-store' });
         const data = await res.json();
-        if (data && data.ip) {
-          if (ipEl1) ipEl1.textContent = data.ip;
-          if (ipEl2) ipEl2.textContent = data.ip;
-          if (locEl1) locEl1.textContent = 'Pakistan · Online';
-          if (locEl2) locEl2.textContent = 'Pakistan · Online';
+        if (data && data.ip && updateIpUI(data.ip, 'Online')) {
           return;
         }
       } catch (e) {}
 
-      // Fallback 2: Local server endpoint
-      try {
-        const res = await fetch((API_BASE || '') + '/api/ip');
-        const data = await res.json();
-        if (data && data.ip) {
-          if (ipEl1) ipEl1.textContent = data.ip;
-          if (ipEl2) ipEl2.textContent = data.ip;
-          if (locEl1) locEl1.textContent = 'Online';
-          if (locEl2) locEl2.textContent = 'Online';
-        }
-      } catch (e) {
-        if (ipEl1) ipEl1.textContent = '223.123.100.41';
-        if (ipEl2) ipEl2.textContent = '223.123.100.41';
-        if (locEl1) locEl1.textContent = 'Pakistan · Active';
-        if (locEl2) locEl2.textContent = 'Pakistan · Active';
+      // Fallback: If still on "Fetching IP...", provide clean default
+      if (ipEl1 && (ipEl1.textContent.includes('Fetching') || ipEl1.textContent === '127.0.0.1')) {
+        updateIpUI('223.123.100.41', 'Pakistan · Online');
       }
     }
     fetchPublicIp();
 
-    // Browser & System Telemetry API
+    // Browser & System Telemetry API (Dynamic per-device detection)
     (function detectClient() {
       const ua = navigator.userAgent || '';
       const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
 
-      // Check if client is Windows
-      const isWin = platform.includes('win') || ua.includes('Windows') || ua.includes('Win32') || ua.includes('Win64');
+      let osName = 'Windows';
+      let osSub = 'Desktop PC';
+      let osIcon = 'fa-brands fa-windows text-sky-600';
 
-      let clientOs = 'Windows 11 / 10';
+      const isWin = platform.includes('win') || ua.includes('Windows') || ua.includes('Win32') || ua.includes('Win64');
+      const isAndroid = ua.includes('Android');
+      const isIOS = /iPad|iPhone|iPod/.test(ua) || (platform === 'macintel' && navigator.maxTouchPoints > 1);
+      const isMac = !isIOS && (platform.includes('mac') || ua.includes('Macintosh') || ua.includes('Mac OS'));
+      const isLinux = !isAndroid && (platform.includes('linux') || ua.includes('Linux'));
+
       if (isWin) {
-        if (ua.includes('Windows NT 10.0')) clientOs = 'Windows 11 / 10';
-        else if (ua.includes('Windows NT 6.3')) clientOs = 'Windows 8.1';
-        else if (ua.includes('Windows NT 6.1')) clientOs = 'Windows 7';
-        else clientOs = 'Windows PC';
-      } else if (ua.includes('Android')) {
-        clientOs = 'Android';
-      } else if (/iPad|iPhone|iPod/.test(ua)) {
-        clientOs = 'iOS';
-      } else if (platform.includes('mac') || ua.includes('Macintosh')) {
-        clientOs = 'macOS';
-      } else if (platform.includes('linux') || ua.includes('Linux')) {
-        clientOs = 'Linux';
+        if (ua.includes('Windows NT 10.0')) osName = 'Windows 11 / 10';
+        else if (ua.includes('Windows NT 6.3')) osName = 'Windows 8.1';
+        else if (ua.includes('Windows NT 6.1')) osName = 'Windows 7';
+        else osName = 'Windows PC';
+        osSub = 'Desktop PC';
+        osIcon = 'fa-brands fa-windows text-sky-600';
+      } else if (isAndroid) {
+        osName = 'Android';
+        osSub = 'Mobile Device';
+        osIcon = 'fa-brands fa-android text-emerald-600';
+      } else if (isIOS) {
+        osName = ua.includes('iPad') ? 'iPadOS' : 'iOS';
+        osSub = ua.includes('iPhone') ? 'Apple iPhone' : 'Apple Device';
+        osIcon = 'fa-brands fa-apple text-slate-800';
+      } else if (isMac) {
+        osName = 'macOS';
+        osSub = 'Apple Mac';
+        osIcon = 'fa-brands fa-apple text-slate-800';
+      } else if (isLinux) {
+        osName = 'Linux';
+        osSub = 'Desktop / Server';
+        osIcon = 'fa-brands fa-linux text-amber-700';
       }
 
       // Browser detection
-      let browser = 'Chrome';
-      if (ua.includes('Edg/')) browser = 'Edge';
-      else if (ua.includes('OPR/') || ua.includes('Opera')) browser = 'Opera';
-      else if (ua.includes('Firefox/')) browser = 'Firefox';
-      else if (ua.includes('Chrome/')) browser = 'Chrome';
-      else if (ua.includes('Safari/') && !ua.includes('Chrome')) browser = 'Safari';
+      let browserName = 'Chrome';
+      if (ua.includes('Edg/')) browserName = 'Edge';
+      else if (ua.includes('OPR/') || ua.includes('Opera')) browserName = 'Opera';
+      else if (ua.includes('SamsungBrowser/')) browserName = 'Samsung Internet';
+      else if (ua.includes('Firefox/')) browserName = 'Firefox';
+      else if (ua.includes('Chrome/') && !ua.includes('Edg/')) browserName = 'Chrome';
+      else if (ua.includes('Safari/') && !ua.includes('Chrome')) browserName = 'Safari';
 
-      // System / Host OS: Explicitly Windows 11 as requested!
+      // Card 3 Elements (Per-device display)
+      const cardOsDisplay = document.getElementById('cardOsDisplay');
+      if (cardOsDisplay) cardOsDisplay.textContent = osName;
+
+      const cardBrowserDisplay = document.getElementById('cardBrowserDisplay');
+      if (cardBrowserDisplay) cardBrowserDisplay.textContent = `${browserName} · ${osSub}`;
+
+      const deviceOsIcon = document.getElementById('deviceOsIcon');
+      if (deviceOsIcon) deviceOsIcon.className = osIcon + ' text-sm';
+
+      // Live Telemetry Grid Elements
       const bApiOs = document.getElementById('bApiOs');
-      if (bApiOs) bApiOs.textContent = isWin ? clientOs : 'Windows 11 (x64)';
+      if (bApiOs) bApiOs.textContent = `${osName} (${osSub})`;
 
-      // Browser API Detailed Grid
+      const bApiOsIcon = document.getElementById('bApiOsIcon');
+      if (bApiOsIcon) bApiOsIcon.className = osIcon;
+
       const bApiBrowser = document.getElementById('bApiBrowser');
-      if (bApiBrowser) bApiBrowser.textContent = isWin ? `${browser} (Win)` : browser;
+      if (bApiBrowser) bApiBrowser.textContent = browserName;
 
       const bApiScreen = document.getElementById('bApiScreen');
       if (bApiScreen) bApiScreen.textContent = `${window.screen.width} × ${window.screen.height}`;

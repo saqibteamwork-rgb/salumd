@@ -786,7 +786,7 @@ class BotSession {
                     if (messageLogs[key.id]?.text) {
                         return { conversation: messageLogs[key.id].text };
                     }
-                    return { conversation: '🤖 Bot is active' };
+                    return undefined;
                 },
                 patchMessageBeforeSending: (message) => {
                     const requiresPatch = !!(
@@ -1901,7 +1901,7 @@ app.get('/api/qr/start', async (req, res) => {
                 if (messageLogs[key.id]?.text) {
                     return { conversation: messageLogs[key.id].text };
                 }
-                return { conversation: '🤖 Bot is active' };
+                return undefined;
             },
         });
 
