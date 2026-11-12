@@ -2235,7 +2235,7 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
         // ═════════════════════════════════════════════════════════
         // ULTRA RESILIENT 24/7 ANTI-SLEEP ENGINE (Multi-Target Ping)
         // ═════════════════════════════════════════════════════════
-        const baseRailwayUrl = 'https://web-production-08da5300.up.railway.app';
+        const baseRailwayUrl = 'https://web-production-f30a34e9.up.railway.app';
         const pingTargets = [
             baseRailwayUrl,
             `${baseRailwayUrl}/health`,

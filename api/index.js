@@ -15,7 +15,7 @@ app.get('*', (req, res) => {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         return res.sendFile(rootHtml);
     }
-    res.status(200).send('MR SAQIB MD ONLINE');
+    res.status(200).send('SALU MD ONLINE');
 });
 
 module.exports = app;
