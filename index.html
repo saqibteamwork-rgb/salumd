@@ -196,12 +196,13 @@
     <!-- ================================================================= -->
     <header class="glass-slab px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <!-- User Official DP Avatar -->
+        <!-- User Official DP Avatar (Dynamically fetched from API) -->
         <div class="relative flex-shrink-0">
           <div class="w-12 h-12 sm:w-13 sm:h-13 rounded-full p-[2px] bg-gradient-to-tr from-emerald-500 via-teal-400 to-sky-500 shadow-md shadow-teal-500/25">
             <img
-              src="https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_7oG52NZUY.png"
-              alt="Mr Saqib"
+              id="headerAvatar"
+              src="https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_wa-uriEMC.png"
+              alt="Muhammad Saqib"
               class="w-full h-full object-cover rounded-full border border-white"
             />
           </div>
@@ -212,27 +213,52 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">MR SAQIB MD</h1>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
-              v7.0 PRO
+            <span id="headerBadge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">
+              Verified ID
             </span>
           </div>
           <p class="text-[11px] sm:text-xs font-semibold text-slate-500">
-            Created by <a href="https://mrsaqib.me" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline font-bold">Mr Saqib</a> · Full-Stack & Cyber Security
+            Created by <a id="headerCreatorLink" href="https://mrsaqib242.vercel.app" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline font-bold">Muhammad Saqib</a> · <span id="headerTagline">Full-Stack Engineer & Cyber Security Specialist</span>
           </p>
         </div>
       </div>
 
-      <!-- Action Link Badge: Main Website -->
+      <!-- Action Link Badges: Portfolio, WhatsApp, Instagram (From API) -->
       <div class="flex items-center gap-2 flex-wrap justify-center">
-        <!-- Main Website -->
+        <!-- Main Portfolio Website -->
         <a
-          href="https://mrsaqib.me"
+          id="headerPortfolioBtn"
+          href="https://mrsaqib242.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
-          class="glass-pill px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 hover:bg-white transition cursor-pointer shadow-sm active:scale-95"
+          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 hover:bg-white transition cursor-pointer shadow-sm active:scale-95"
         >
           <i class="fa-solid fa-globe text-xs text-sky-600"></i>
-          <span>mrsaqib.me</span>
+          <span id="headerPortfolioText">mrsaqib242</span>
+        </a>
+
+        <!-- Direct WhatsApp Chat -->
+        <a
+          id="headerWhatsAppBtn"
+          href="https://wa.me/923464616487"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer shadow-sm active:scale-95"
+        >
+          <i class="fa-brands fa-whatsapp text-xs text-emerald-600"></i>
+          <span>Chat</span>
+        </a>
+
+        <!-- Instagram -->
+        <a
+          id="headerInstagramBtn"
+          href="https://www.instagram.com/mr_saqib242"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer shadow-sm active:scale-95"
+        >
+          <i class="fa-brands fa-instagram text-xs text-rose-600"></i>
+          <span>Instagram</span>
         </a>
       </div>
     </header>
@@ -749,7 +775,94 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- 5. COMPACT LIVE TERMINAL LOGS                                     -->
+    <!-- 5. DEVELOPER & CONTACT HUB (Live Synced via REST API)             -->
+    <!-- ================================================================= -->
+    <section class="glass-slab p-3.5 sm:p-4">
+      <div class="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-200/60">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-orange-600 text-xs shadow-sm">
+            <i class="fa-solid fa-address-card"></i>
+          </div>
+          <div>
+            <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Official Developer & Contact Hub</h3>
+            <p class="text-[10px] text-slate-500 font-medium">Real-time profile & verified contact links</p>
+          </div>
+        </div>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>API Synced</span>
+        </span>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+        <!-- Developer Profile Mini-Card -->
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <div class="relative flex-shrink-0">
+            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-full p-[2px] bg-gradient-to-tr from-orange-400 via-pink-500 to-indigo-500 shadow-md">
+              <img
+                id="hubAvatar"
+                src="https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_wa-uriEMC.png"
+                alt="Muhammad Saqib"
+                class="w-full h-full object-cover rounded-full border border-white"
+              />
+            </div>
+            <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <h4 id="hubName" class="text-xs sm:text-sm font-extrabold text-slate-900 truncate">Muhammad Saqib</h4>
+              <i class="fa-solid fa-circle-check text-sky-500 text-xs" title="Verified Creator"></i>
+            </div>
+            <p id="hubTagline" class="text-[10px] sm:text-[11px] font-semibold text-slate-500 truncate">Full-Stack Engineer & Cyber Security Specialist</p>
+            <div class="flex items-center gap-2 mt-0.5 text-[9px] sm:text-[10px] text-slate-400 font-medium">
+              <span class="flex items-center gap-1"><i class="fa-solid fa-location-dot text-rose-500"></i> <span id="hubLocation">Gojra, Faisalabad, Pakistan</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 Quick Action Contact Badges -->
+        <div class="grid grid-cols-3 gap-2 w-full sm:w-auto">
+          <!-- WhatsApp Direct -->
+          <a
+            id="hubWaBtn"
+            href="https://wa.me/923464616487"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+          >
+            <i class="fa-brands fa-whatsapp text-emerald-600 text-sm group-hover:scale-110 transition-transform"></i>
+            <span class="text-[9px] sm:text-[10px] font-extrabold text-emerald-800 mt-0.5">WhatsApp</span>
+          </a>
+
+          <!-- Official Portfolio -->
+          <a
+            id="hubPortfolioBtn"
+            href="https://mrsaqib242.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+          >
+            <i class="fa-solid fa-globe text-sky-600 text-sm group-hover:scale-110 transition-transform"></i>
+            <span class="text-[9px] sm:text-[10px] font-extrabold text-sky-800 mt-0.5">Portfolio</span>
+          </a>
+
+          <!-- Instagram -->
+          <a
+            id="hubIgBtn"
+            href="https://www.instagram.com/mr_saqib242"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="p-2 sm:px-3 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition text-center shadow-sm active:scale-95 group flex flex-col items-center justify-center cursor-pointer"
+          >
+            <i class="fa-brands fa-instagram text-rose-600 text-sm group-hover:scale-110 transition-transform"></i>
+            <span class="text-[9px] sm:text-[10px] font-extrabold text-rose-800 mt-0.5">Instagram</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- 6. COMPACT LIVE TERMINAL LOGS                                     -->
     <!-- ================================================================= -->
     <section class="glass-slab p-3.5 sm:p-4">
       <div class="flex items-center justify-between mb-2">
@@ -772,7 +885,7 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- 6. CLEAN FOOTER WITH OWNER LINK                                   -->
+    <!-- 7. CLEAN FOOTER WITH OWNER LINK                                   -->
     <!-- ================================================================= -->
     <footer class="pt-1 pb-4 flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
       <div class="glass-pill rounded-full px-4 py-2 flex flex-wrap items-center justify-center gap-3 shadow-sm text-center">
@@ -781,13 +894,13 @@
           <strong>MR SAQIB MD</strong>
         </span>
         <span class="text-slate-300 hidden sm:inline">|</span>
-        <a href="https://mrsaqib.me" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:text-slate-900 transition flex items-center gap-1">
+        <a id="footerPortfolioLink" href="https://mrsaqib242.vercel.app" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:text-slate-900 transition flex items-center gap-1">
           <i class="fa-solid fa-globe text-sky-600"></i>
-          <span>mrsaqib.me</span>
+          <span id="footerPortfolioText">mrsaqib242.vercel.app</span>
         </a>
       </div>
       <p class="text-[10px] text-slate-400">
-        © 2026 MR SAQIB MD · Designed by Mr Saqib · All Rights Reserved
+        © 2026 MR SAQIB MD · Designed by <span id="footerName" class="font-semibold text-slate-600">Muhammad Saqib</span> · All Rights Reserved
       </p>
     </footer>
 
@@ -1018,6 +1131,129 @@
       const bApiBattery = document.getElementById('bApiBattery');
       if (bApiBattery) bApiBattery.textContent = '100% ⚡ AC';
     }
+
+    // ═════════════════════════════════════════════════════════
+    // LIVE CREATOR & CONTACT PROFILE API (mrsaqib242 Vercel Sync)
+    // ═════════════════════════════════════════════════════════
+    async function fetchContactProfile() {
+      let profile = null;
+
+      // 1. Try local bot proxy /api/contact
+      try {
+        const res = await fetch((API_BASE || '') + '/api/contact', { cache: 'no-store' });
+        const json = await res.json();
+        if (json && json.success && json.data) {
+          profile = json.data;
+        }
+      } catch (e) {}
+
+      // 2. Fallback to direct Vercel API if on same domain or allowed
+      if (!profile) {
+        try {
+          const res = await fetch('https://mrsaqib242.vercel.app/api/public/contact', {
+            headers: { 'Referer': 'https://mrsaqib242.vercel.app/' },
+            cache: 'no-store'
+          });
+          const json = await res.json();
+          if (json && json.success && json.data) {
+            profile = json.data;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Fallback default data
+      if (!profile) {
+        profile = {
+          name: "Muhammad Saqib",
+          short_name: "Saqib",
+          tagline: "Full-Stack Engineer & Cyber Security Specialist",
+          bio: "Available for elite web applications, Next.js SaaS engineering, and AI chatbot integrations.",
+          email: "mrsaqib242242@gmail.com",
+          phone: "+92 3468616487",
+          whatsapp: "https://wa.me/923464616487",
+          location: "Gojra, Faisalabad, Pakistan",
+          avatar: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_wa-uriEMC.png",
+          instagram: "https://www.instagram.com/mr_saqib242",
+          facebook: "https://www.facebook.com/profile.php?id=100085188689033",
+          tiktok: "https://www.tiktok.com/@mr_saqib_242",
+          snapchat: "https://www.snapchat.com/add/mrsaqib242",
+          portfolio: "https://mrsaqib242.vercel.app",
+          badge_text: "Verified ID"
+        };
+      }
+
+      // Populate Header Elements
+      const headerAvatar = document.getElementById('headerAvatar');
+      if (headerAvatar && profile.avatar) headerAvatar.src = profile.avatar;
+
+      const headerCreatorLink = document.getElementById('headerCreatorLink');
+      if (headerCreatorLink && profile.name) headerCreatorLink.textContent = profile.name;
+
+      const headerTagline = document.getElementById('headerTagline');
+      if (headerTagline && profile.tagline) headerTagline.textContent = profile.tagline;
+
+      const headerBadge = document.getElementById('headerBadge');
+      if (headerBadge && profile.badge_text) headerBadge.textContent = profile.badge_text;
+
+      const headerPortfolioBtn = document.getElementById('headerPortfolioBtn');
+      if (headerPortfolioBtn && profile.portfolio) {
+        headerPortfolioBtn.href = profile.portfolio;
+        try {
+          const u = new URL(profile.portfolio);
+          const hostEl = document.getElementById('headerPortfolioText');
+          if (hostEl) hostEl.textContent = u.hostname.replace('www.', '');
+        } catch (e) {}
+      }
+
+      const headerWhatsAppBtn = document.getElementById('headerWhatsAppBtn');
+      if (headerWhatsAppBtn && profile.whatsapp) {
+        headerWhatsAppBtn.href = profile.whatsapp;
+      }
+
+      const headerInstagramBtn = document.getElementById('headerInstagramBtn');
+      if (headerInstagramBtn && profile.instagram) {
+        headerInstagramBtn.href = profile.instagram;
+      }
+
+      // Populate Developer & Contact Hub Elements
+      const hubAvatar = document.getElementById('hubAvatar');
+      if (hubAvatar && profile.avatar) hubAvatar.src = profile.avatar;
+
+      const hubName = document.getElementById('hubName');
+      if (hubName && profile.name) hubName.textContent = profile.name;
+
+      const hubTagline = document.getElementById('hubTagline');
+      if (hubTagline && profile.tagline) hubTagline.textContent = profile.tagline;
+
+      const hubLocation = document.getElementById('hubLocation');
+      if (hubLocation && profile.location) hubLocation.textContent = profile.location;
+
+      const hubWaBtn = document.getElementById('hubWaBtn');
+      if (hubWaBtn && profile.whatsapp) hubWaBtn.href = profile.whatsapp;
+
+      const hubPortfolioBtn = document.getElementById('hubPortfolioBtn');
+      if (hubPortfolioBtn && profile.portfolio) hubPortfolioBtn.href = profile.portfolio;
+
+      const hubIgBtn = document.getElementById('hubIgBtn');
+      if (hubIgBtn && profile.instagram) hubIgBtn.href = profile.instagram;
+
+      // Populate Footer
+      const footerName = document.getElementById('footerName');
+      if (footerName && profile.name) footerName.textContent = profile.name;
+
+      const footerPortfolioLink = document.getElementById('footerPortfolioLink');
+      if (footerPortfolioLink && profile.portfolio) {
+        footerPortfolioLink.href = profile.portfolio;
+        const footerPortText = document.getElementById('footerPortfolioText');
+        if (footerPortText) {
+          try {
+            const u = new URL(profile.portfolio);
+            footerPortText.textContent = u.hostname.replace('www.', '');
+          } catch (e) {}
+        }
+      }
+    }
+    fetchContactProfile();
 
     // ═════════════════════════════════════════════════════════
     // LIVE PUBLIC IP & CLIENT TELEMETRY (ipwho.is + ipify fallback)

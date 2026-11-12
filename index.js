@@ -453,6 +453,82 @@ app.get('/api/ip', (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// LIVE CREATOR & CONTACT PROFILE PROXY
+// Fetches real-time profile from mrsaqib242 Vercel API with caching
+// ═══════════════════════════════════════
+let contactCache = null;
+let contactCacheTime = 0;
+const CONTACT_CACHE_TTL = 90 * 1000; // 90 seconds cache
+
+const CONTACT_FALLBACK = {
+    name: "Muhammad Saqib",
+    short_name: "Saqib",
+    tagline: "Full-Stack Engineer & Cyber Security Specialist",
+    bio: "Available for elite web applications, Next.js SaaS engineering, and AI chatbot integrations.",
+    email: "mrsaqib242242@gmail.com",
+    phone: "+92 3468616487",
+    whatsapp: "https://wa.me/923464616487",
+    location: "Gojra, Faisalabad, Pakistan",
+    avatar: "https://ik.imagekit.io/mrsaqib/mrsaqib242-img25_wa-uriEMC.png",
+    instagram: "https://www.instagram.com/mr_saqib242",
+    facebook: "https://www.facebook.com/profile.php?id=100085188689033",
+    tiktok: "https://www.tiktok.com/@mr_saqib_242",
+    snapchat: "https://www.snapchat.com/add/mrsaqib242",
+    telegram: "https://t.me/mrsaqib242",
+    portfolio: "https://mrsaqib242.vercel.app",
+    github: "https://github.com/mr-saqib-242",
+    resume: "/resume.pdf",
+    contract_status: "Open for New Projects",
+    contract_subtitle: "Remote Worldwide • NDA Protected",
+    availability_note: "Available for Remote Worldwide Contracts & Security Audits.",
+    badge_text: "Verified ID",
+    cv_badge: "PDF 2026/27"
+};
+
+app.get(['/api/contact', '/api/public/contact'], async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+
+    const now = Date.now();
+    const force = req.query.refresh === '1';
+
+    if (!force && contactCache && (now - contactCacheTime < CONTACT_CACHE_TTL)) {
+        return res.json({ success: true, source: 'cache', data: contactCache });
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const upstreamRes = await fetch('https://mrsaqib242.vercel.app/api/public/contact', {
+            signal: controller.signal,
+            headers: {
+                'Referer': 'https://mrsaqib242.vercel.app/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        clearTimeout(timeout);
+
+        if (upstreamRes.ok) {
+            const data = await upstreamRes.json();
+            if (data && data.success && data.data) {
+                contactCache = data.data;
+                contactCacheTime = now;
+                return res.json({ success: true, source: 'upstream', data: data.data });
+            }
+        }
+    } catch (e) {
+        // Fallback below
+    }
+
+    if (contactCache) {
+        return res.json({ success: true, source: 'stale_cache', data: contactCache });
+    }
+
+    return res.json({ success: true, source: 'fallback', data: CONTACT_FALLBACK });
+});
+
+// ═══════════════════════════════════════
 // QR CODE SCAN SETUP
 // ═══════════════════════════════════════
 const qrcode = require('qrcode');
