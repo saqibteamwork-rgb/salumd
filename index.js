@@ -439,6 +439,19 @@ app.get('/api/active', (req, res) => {
     });
 });
 
+app.get('/api/ip', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (forwarded ? forwarded.split(',')[0].trim() : req.socket?.remoteAddress || req.ip || '127.0.0.1').replace('::ffff:', '');
+    return res.json({
+        success: true,
+        ip,
+        os: 'Windows 11 (x64)',
+        node: process.version,
+        platform: process.platform
+    });
+});
+
 // ═══════════════════════════════════════
 // QR CODE SCAN SETUP
 // ═══════════════════════════════════════
