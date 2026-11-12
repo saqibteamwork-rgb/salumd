@@ -50,18 +50,27 @@ const cleanTempFolderIfLarge = () => {
     } catch (err) {}
 };
 
-setInterval(cleanTempFolderIfLarge, 60 * 1000);
+setInterval(cleanTempFolderIfLarge, 10 * 60 * 1000);
+
+let cachedAntideleteConfig = null;
 
 function loadAntideleteConfig() {
+    if (cachedAntideleteConfig) return cachedAntideleteConfig;
     try {
-        if (!fs.existsSync(CONFIG_PATH)) return { enabled: false };
-        return JSON.parse(fs.readFileSync(CONFIG_PATH));
+        if (!fs.existsSync(CONFIG_PATH)) {
+            cachedAntideleteConfig = { enabled: false };
+            return cachedAntideleteConfig;
+        }
+        cachedAntideleteConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+        return cachedAntideleteConfig;
     } catch {
-        return { enabled: false };
+        cachedAntideleteConfig = { enabled: false };
+        return cachedAntideleteConfig;
     }
 }
 
 function saveAntideleteConfig(config) {
+    cachedAntideleteConfig = config;
     try {
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
     } catch (err) {}

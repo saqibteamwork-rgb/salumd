@@ -10,12 +10,23 @@ const settings = require('../settings');
 // Path to store the configuration
 const configPath = path.join(__dirname, '..', 'data', 'autoread.json');
 
+// In-memory cache to prevent blocking disk I/O on every single message
+let cachedConfig = null;
+
 // Initialize configuration file if it doesn't exist
 function initConfig() {
-    if (!fs.existsSync(configPath)) {
-        fs.writeFileSync(configPath, JSON.stringify({ enabled: false }, null, 2));
+    if (cachedConfig) return cachedConfig;
+    try {
+        if (!fs.existsSync(configPath)) {
+            fs.writeFileSync(configPath, JSON.stringify({ enabled: false }, null, 2));
+            cachedConfig = { enabled: false };
+        } else {
+            cachedConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        }
+    } catch (e) {
+        cachedConfig = { enabled: false };
     }
-    return JSON.parse(fs.readFileSync(configPath));
+    return cachedConfig;
 }
 
 // Toggle autoread feature
@@ -73,8 +84,9 @@ async function autoreadCommand(sock, chatId, message) {
             config.enabled = !config.enabled;
         }
         
-        // Save updated configuration
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        // Save updated configuration and update cache
+        cachedConfig = config;
+        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2)); } catch (e) {}
         
         // Send confirmation message
         await sock.sendMessage(chatId, {

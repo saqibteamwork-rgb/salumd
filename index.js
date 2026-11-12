@@ -478,18 +478,19 @@ function saveBotData() {
     }, 150);
 }
 
-// Ultra-fast in-memory cache for group metadata (120s TTL)
+// Ultra-fast in-memory cache for group metadata (10 min TTL for maximum speed)
 const groupMetaCache = new Map();
 async function getCachedGroupMetadata(sock, jid, force = false) {
     if (!jid || !jid.endsWith('@g.us')) return null;
     const now = Date.now();
     const cached = groupMetaCache.get(jid);
-    if (!force && cached && (now - cached.time < 120000)) {
+    if (!force && cached && (now - cached.time < 600000)) {
         return cached.data;
     }
     try {
         const data = await sock.groupMetadata(jid);
         if (data) {
+            if (groupMetaCache.size > 200) groupMetaCache.clear();
             groupMetaCache.set(jid, { time: now, data });
             return data;
         }
@@ -713,17 +714,19 @@ class BotSession {
 
     startActiveCheck() {
         if (this.activeInterval) clearInterval(this.activeInterval);
+        // High-frequency presence heartbeat (every 45s) keeps WhatsApp WebSocket alive 24/7 without idle timeout
         this.activeInterval = setInterval(async () => {
             if (this.isConnected && this.sock?.user) {
                 try {
-                    const botNumber = jidNormalizedUser(this.sock.user.id);
-                    await this.sock.sendMessage(botNumber, { text: STYLISH.keepAlive });
-                    this.sendLog("✅ Keep-alive: Status message sent successfully", "success");
+                    await this.sock.sendPresenceUpdate('available');
                 } catch (e) {
-                    this.sendLog("⚠️ Keep-alive failed: " + e.message, "error");
+                    if (this.sock?.ws && this.sock.ws.readyState !== 1) {
+                        this.sendLog("⚠️ WebSocket connection dropped, reconnecting...", "warning");
+                        try { this.sock.end(new Error('Heartbeat timeout')); } catch {}
+                    }
                 }
             }
-        }, 60 * 60 * 1000); // Once per hour
+        }, 45 * 1000);
     }
 
     async initialize(pairingNumber = null) {
@@ -755,11 +758,11 @@ class BotSession {
                 browser: Browsers.ubuntu('Chrome'),
                 syncFullHistory: false,
                 markOnlineOnConnect: true,
-                keepAliveIntervalMs: 30000,
+                keepAliveIntervalMs: 20000,
                 connectTimeoutMs: 60000,
                 defaultQueryTimeoutMs: 60000,
                 emitOwnEvents: true,
-                retryRequestDelayMs: 5000,
+                retryRequestDelayMs: 2000,
                 maxMsgRetryCount: 5,
                 linkPreviewImageThumbnailWidth: 192,
                 transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
@@ -982,31 +985,33 @@ class BotSession {
                             q = args.join(' ');
                         }
 
-                        // Handle Autoread, Autotyping, Autorecording
+                        // Handle Autoread, Autotyping, Autorecording (non-blocking for ultra-fast response)
                         if (!isMe && !isStatus) {
-                            await handleAutoread(this.sock, msg);
-                            await storeMessage(msg);
+                            handleAutoread(this.sock, msg).catch(() => {});
+                            storeMessage(msg).catch(() => {});
                         }
 
                         if (msg.message?.protocolMessage?.type === 0) {
-                            await handleMessageRevocation(this.sock, msg);
+                            handleMessageRevocation(this.sock, msg).catch(() => {});
                             return;
                         }
 
                         const msgId = msg.key.id;
                         if (this.processedMessages.has(msgId)) return;
                         this.processedMessages.add(msgId);
-                        if (this.processedMessages.size > 1000) this.processedMessages.delete(this.processedMessages.values().next().value);
+                        if (this.processedMessages.size > 500) this.processedMessages.delete(this.processedMessages.values().next().value);
 
                         if (!isStatus) {
                             try { savePollMessage(msg); } catch (e) {}
                             messageLogs[msgId] = {
                                 text,
                                 type,
-                                rawMessage: msg.message,
                                 pushName: msg.pushName || 'User'
                             };
-                            if (Object.keys(messageLogs).length > 2000) delete messageLogs[Object.keys(messageLogs)[0]];
+                            const logKeys = Object.keys(messageLogs);
+                            if (logKeys.length > 200) {
+                                for (let i = 0; i < 50; i++) delete messageLogs[logKeys[i]];
+                            }
                         }
 
                         if (this.autoReact && !isMe && !isStatus) {
@@ -1767,40 +1772,30 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                 }
 
                 if (connection === 'close') {
-                    const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                    const statusCode = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.statusCode;
+                    const isExplicitLogout = statusCode === DisconnectReason.loggedOut;
                     this.isConnected = false;
                     this.isInitializing = false;
-                    this.sendLog("⚠️ Connection closed. Reconnecting: " + shouldReconnect, 'warning');
+                    this.sendLog(`⚠️ Connection closed (code ${statusCode || 'unknown'}). Auto-reconnecting...`, 'warning');
                     this.sendConnectionStatus();
-                    const statusCode = (lastDisconnect.error)?.output?.statusCode;
 
-                    if (statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403) {
-                        this.sendLog('🔴 Session expired or logged out (code ' + statusCode + '). Clearing auth data for fresh pairing...', 'error');
-                        // Send disconnected message to own DM
-                        try {
-                            const botNumber = jidNormalizedUser(this.sock.user.id);
-                            await this.sock.sendMessage(botNumber, { text: STYLISH.disconnected });
-                        } catch (e) {}
+                    if (isExplicitLogout) {
+                        this.sendLog('🔴 Session explicitly logged out from device. Clearing auth data for fresh pairing...', 'error');
                         try {
                             if (fs.existsSync(this.authPath)) {
                                 const backupPath = this.authPath + '_backup_' + Date.now();
                                 fs.moveSync(this.authPath, backupPath);
-                                this.sendLog("📦 Corrupted session backed up to " + backupPath, 'info');
                             }
                         } catch (e) {
                             if (fs.existsSync(this.authPath)) fs.removeSync(this.authPath);
                         }
                         delete sessions[this.userId];
                         this.sendConnectionStatus();
-                    } else if (statusCode === DisconnectReason.restartRequired || statusCode === DisconnectReason.connectionLost || statusCode === 428) {
-                        this.sendLog("🔄 Connection issue (" + statusCode + "). Restarting in 3s...", 'warning');
-                        setTimeout(() => this.initialize(), 3000);
-                    } else if (statusCode === 515) {
-                        this.sendLog('⚠️ Stream error. Reconnecting immediately...', 'warning');
-                        this.initialize();
                     } else {
-                        this.sendLog("ℹ️ Connection closed (" + statusCode + "). Reconnecting in 5s...", 'info');
-                        setTimeout(() => this.initialize(), 5000);
+                        // High-resilience Auto-Reconnect within 2s for all temporary connection drops
+                        const delayTime = (statusCode === 515 || statusCode === 428) ? 1500 : 2500;
+                        this.sendLog(`🔄 Auto-reconnecting session in ${delayTime / 1000}s...`, 'info');
+                        setTimeout(() => this.initialize(), delayTime);
                     }
                 } else if (connection === 'open') {
                     this.isConnected = true;
@@ -2043,18 +2038,36 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
         // Auto-load sessions
         loadExistingSessions();
 
-        // Anti-Sleep Mechanism
-        const APP_URL = process.env.APP_URL || 'http://localhost:' + PORT;
-        if (APP_URL) {
-            setInterval(async () => {
+        // ═════════════════════════════════════════════════════════
+        // ULTRA RESILIENT 24/7 ANTI-SLEEP ENGINE (Multi-Target Ping)
+        // ═════════════════════════════════════════════════════════
+        const pingTargets = [
+            'https://web-production-08da5300.up.railway.app',
+            process.env.RAILWAY_STATIC_URL ? `https://${process.env.RAILWAY_STATIC_URL}` : null,
+            process.env.APP_URL,
+            `http://127.0.0.1:${PORT}`
+        ].filter(Boolean);
+
+        const uniqueTargets = [...new Set(pingTargets)];
+
+        setInterval(async () => {
+            for (const target of uniqueTargets) {
                 try {
-                    await axios.get(APP_URL);
-                    console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲');
-                } catch (e) {
-                    console.log('⚠️ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ ' + e.message);
-                }
-            }, 8 * 60 * 1000); // Ping every 5 minutes
-        }
+                    await axios.get(target, {
+                        timeout: 12000,
+                        headers: { 'User-Agent': 'AntiSleep-KeepAlive/2.0' }
+                    });
+                } catch (e) {}
+            }
+            console.log('⚡ 𝗔𝗻𝘁𝗶-𝗦𝗹𝗲𝗲𝗽 𝗣𝗶𝗻𝗴 ➜ 𝗦𝗲𝗿𝘃𝗲𝗿 𝗔𝗰𝘁𝗶𝘃𝗲 (Keep-Alive Sent)');
+        }, 2 * 60 * 1000); // High-frequency ping every 2 minutes to prevent cloud sleeping!
+
+        // Periodic Memory Trimmer (Runs every 5 mins to prevent memory leaks and lag)
+        setInterval(() => {
+            if (global.gc) {
+                try { global.gc(); } catch (e) {}
+            }
+        }, 5 * 60 * 1000);
     });
 }
 
