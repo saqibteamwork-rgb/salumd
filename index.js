@@ -1935,8 +1935,24 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                         console.error('[channelHub] session init error:', e.message);
                     }
 
-                    // Session connected silently without spamming WhatsApp chats with automated status messages
-                    this.sendLog("🤖 Bot session fully active and monitoring silently.", "success");
+                    // Deliver Connected Status message strictly to "You" (Own Private Chat) — NEVER groups or channels!
+                    setTimeout(async () => {
+                        try {
+                            if (this.isConnected && this.sock?.user) {
+                                const selfJid = jidNormalizedUser(this.sock.user.id);
+                                if (selfJid && selfJid.endsWith('@s.whatsapp.net') && !selfJid.includes('@g.us') && !selfJid.includes('@newsletter')) {
+                                    const now = Date.now();
+                                    if (!this.lastConnectMessageTime || (now - this.lastConnectMessageTime > 5 * 60 * 1000)) {
+                                        await this.sock.sendMessage(selfJid, { text: STYLISH.connected });
+                                        this.lastConnectMessageTime = now;
+                                        this.sendLog('⚡ "Status: Connected" message delivered to "You" (Self Chat).', 'success');
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.log('[Notice] Self-chat connect message notice:', e.message);
+                        }
+                    }, 4000);
                 }
             });
     }
