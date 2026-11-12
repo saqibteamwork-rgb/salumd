@@ -192,7 +192,7 @@
   <main class="w-full max-w-[820px] space-y-4 sm:space-y-5">
 
     <!-- ================================================================= -->
-    <!-- 1. TOP HEADER WITH USER DP & CHANNEL LINK                         -->
+    <!-- 1. TOP HEADER WITH USER DP & WEBSITE LINK                         -->
     <!-- ================================================================= -->
     <header class="glass-slab px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-3">
@@ -222,26 +222,14 @@
         </div>
       </div>
 
-      <!-- Action Link Badges: Channel & Main Website -->
+      <!-- Action Link Badge: Main Website -->
       <div class="flex items-center gap-2 flex-wrap justify-center">
-        <!-- Official WhatsApp Channel -->
-        <a
-          href="https://whatsapp.com/channel/0029VbBTSK1EquiWrUt5uV1I"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="glass-pill px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50/90 hover:bg-emerald-100 transition cursor-pointer shadow-sm active:scale-95"
-        >
-          <i class="fa-brands fa-whatsapp text-sm text-emerald-600"></i>
-          <span>WhatsApp Channel</span>
-          <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-70"></i>
-        </a>
-
         <!-- Main Website -->
         <a
           href="https://mrsaqib.me"
           target="_blank"
           rel="noopener noreferrer"
-          class="glass-pill px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 hover:bg-white transition cursor-pointer shadow-sm active:scale-95"
+          class="glass-pill px-3.5 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white/80 hover:bg-white transition cursor-pointer shadow-sm active:scale-95"
         >
           <i class="fa-solid fa-globe text-xs text-sky-600"></i>
           <span>mrsaqib.me</span>
@@ -286,10 +274,6 @@
 
         <!-- TAB 1: PAIRING CODE -->
         <div id="pairingCodeTab" class="space-y-3.5">
-          <p class="text-[12px] sm:text-xs text-slate-600 font-medium">
-            WhatsApp number country code ke sath enter karein (jaise <code class="px-1.5 py-0.5 bg-white/90 rounded text-emerald-700 font-bold border border-emerald-200">923001234567</code>):
-          </p>
-
           <!-- Input + Button Group -->
           <div class="flex flex-col sm:flex-row items-center gap-2.5">
             <div class="relative w-full flex-1">
@@ -347,10 +331,6 @@
 
         <!-- TAB 2: QR CODE SCAN -->
         <div id="qrCodeTab" class="hidden space-y-3">
-          <p class="text-xs text-slate-600 font-medium">
-            Camera se scan karne ke liye QR generate karein:
-          </p>
-
           <div class="flex flex-col items-center justify-center py-2">
             <button
               id="qrGenBtn"
@@ -529,7 +509,119 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- 4. BOT COMMANDS SHOWCASE (Clean 2-Col Mobile Grid)                -->
+    <!-- 4. LIVE BROWSER & CLIENT API METRICS (Requested by User)          -->
+    <!-- ================================================================= -->
+    <section class="glass-slab p-3.5 sm:p-4">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-sky-100 border border-sky-200 flex items-center justify-center text-sky-600 text-xs shadow-sm">
+            <i class="fa-solid fa-code"></i>
+          </div>
+          <div>
+            <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Live Browser & Device APIs</h3>
+            <p class="text-[10px] text-slate-500 font-medium">Real-time client hardware & navigator specs</p>
+          </div>
+        </div>
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Live API
+        </span>
+      </div>
+
+      <!-- 2-Column Grid on Mobile, 4-Column on Desktop -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+        <!-- Item 1: Browser -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-compass"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Browser</div>
+            <div id="bApiBrowser" class="text-xs font-extrabold text-slate-800 truncate">Detecting...</div>
+          </div>
+        </div>
+
+        <!-- Item 2: Platform / OS -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-laptop"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Platform / OS</div>
+            <div id="bApiOs" class="text-xs font-extrabold text-slate-800 truncate">Detecting...</div>
+          </div>
+        </div>
+
+        <!-- Item 3: Screen Resolution -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-display"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Screen</div>
+            <div id="bApiScreen" class="text-xs font-extrabold text-slate-800 truncate">-- × --</div>
+          </div>
+        </div>
+
+        <!-- Item 4: Battery API -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-battery-half"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Battery API</div>
+            <div id="bApiBattery" class="text-xs font-extrabold text-slate-800 truncate">--%</div>
+          </div>
+        </div>
+
+        <!-- Item 5: CPU Cores -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-microchip"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">CPU Cores</div>
+            <div id="bApiCores" class="text-xs font-extrabold text-slate-800 truncate">-- Cores</div>
+          </div>
+        </div>
+
+        <!-- Item 6: Device RAM -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-memory"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Memory RAM</div>
+            <div id="bApiMemory" class="text-xs font-extrabold text-slate-800 truncate">--</div>
+          </div>
+        </div>
+
+        <!-- Item 7: Network Connection -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-wifi"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Connection</div>
+            <div id="bApiNetwork" class="text-xs font-extrabold text-slate-800 truncate">Online · 4G</div>
+          </div>
+        </div>
+
+        <!-- Item 8: Language & Timezone -->
+        <div class="p-2.5 rounded-xl bg-white/75 border border-slate-200/80 shadow-sm flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 text-xs flex-shrink-0">
+            <i class="fa-solid fa-globe"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Language / Zone</div>
+            <div id="bApiLocale" class="text-xs font-extrabold text-slate-800 truncate">--</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- 5. BOT COMMANDS SHOWCASE (Clean 2-Col Mobile Grid)                -->
     <!-- ================================================================= -->
     <section class="glass-slab p-4 sm:p-5">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-3.5">
@@ -680,7 +772,7 @@
     </section>
 
     <!-- ================================================================= -->
-    <!-- 6. CLEAN FOOTER WITH CHANNEL & OWNER LINKS                        -->
+    <!-- 6. CLEAN FOOTER WITH OWNER LINK                                   -->
     <!-- ================================================================= -->
     <footer class="pt-1 pb-4 flex flex-col items-center justify-center gap-2 text-xs text-slate-500">
       <div class="glass-pill rounded-full px-4 py-2 flex flex-wrap items-center justify-center gap-3 shadow-sm text-center">
@@ -688,11 +780,6 @@
           <i class="fa-solid fa-shield-halved text-emerald-600"></i>
           <strong>MR SAQIB MD</strong>
         </span>
-        <span class="text-slate-300 hidden sm:inline">|</span>
-        <a href="https://whatsapp.com/channel/0029VbBTSK1EquiWrUt5uV1I" target="_blank" rel="noopener noreferrer" class="font-bold text-emerald-700 hover:text-emerald-900 transition flex items-center gap-1">
-          <i class="fa-brands fa-whatsapp text-emerald-600"></i>
-          <span>Official Channel</span>
-        </a>
         <span class="text-slate-300 hidden sm:inline">|</span>
         <a href="https://mrsaqib.me" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:text-slate-900 transition flex items-center gap-1">
           <i class="fa-solid fa-globe text-sky-600"></i>
@@ -917,6 +1004,8 @@
           else if (level > 70) icon.className = 'fa-solid fa-battery-full text-emerald-700 text-sm';
           else if (level > 30) icon.className = 'fa-solid fa-battery-three-quarters text-emerald-700 text-sm';
           else icon.className = 'fa-solid fa-battery-quarter text-orange-600 text-sm';
+          const bApiBattery = document.getElementById('bApiBattery');
+          if (bApiBattery) bApiBattery.textContent = `${level}% ${charging ? '⚡' : ''}`;
         }
         updateBattery();
         battery.addEventListener('levelchange', updateBattery);
@@ -926,9 +1015,11 @@
       document.getElementById('batteryLevelDisplay').textContent = '100%';
       document.getElementById('batteryStatusText').textContent = 'AC Power';
       document.getElementById('batteryChargingText').textContent = 'Plugged In';
+      const bApiBattery = document.getElementById('bApiBattery');
+      if (bApiBattery) bApiBattery.textContent = '100% ⚡ AC';
     }
 
-    // Browser Detection
+    // Browser & System Telemetry API
     (function detectClient() {
       const ua = navigator.userAgent;
       let browser = 'Chrome';
@@ -943,8 +1034,38 @@
       else if (ua.indexOf('Mac') > -1) os = 'macOS';
       else if (ua.indexOf('Linux') > -1) os = 'Linux';
 
+      // Card 2
       document.getElementById('browserNameDisplay').textContent = browser;
       document.getElementById('osDisplay').textContent = os;
+
+      // Browser API Detailed Grid
+      const bApiBrowser = document.getElementById('bApiBrowser');
+      if (bApiBrowser) bApiBrowser.textContent = browser;
+
+      const bApiOs = document.getElementById('bApiOs');
+      if (bApiOs) bApiOs.textContent = os;
+
+      const bApiScreen = document.getElementById('bApiScreen');
+      if (bApiScreen) bApiScreen.textContent = `${window.screen.width} × ${window.screen.height}`;
+
+      const bApiCores = document.getElementById('bApiCores');
+      if (bApiCores) bApiCores.textContent = `${navigator.hardwareConcurrency || 8} Cores`;
+
+      const bApiMemory = document.getElementById('bApiMemory');
+      if (bApiMemory) bApiMemory.textContent = navigator.deviceMemory ? `${navigator.deviceMemory} GB RAM` : 'Normal';
+
+      const bApiNetwork = document.getElementById('bApiNetwork');
+      if (bApiNetwork) {
+        const netType = navigator.connection?.effectiveType ? navigator.connection.effectiveType.toUpperCase() : '4G/WiFi';
+        bApiNetwork.textContent = navigator.onLine ? `Online · ${netType}` : 'Offline';
+      }
+
+      const bApiLocale = document.getElementById('bApiLocale');
+      if (bApiLocale) {
+        let tz = 'UTC';
+        try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop().replace('_', ' '); } catch (e) {}
+        bApiLocale.textContent = `${navigator.language || 'en'} · ${tz}`;
+      }
     })();
 
     // Ping
