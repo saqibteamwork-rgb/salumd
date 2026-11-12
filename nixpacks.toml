@@ -1,13 +1,16 @@
 # Railway Nixpacks Configuration for MR SAQIB MD
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg"]
+nixPkgs = ["nodejs_22", "ffmpeg"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install --production=false"]
 
 [phases.build]
 cmds = []
 
+[variables]
+NODE_OPTIONS = "--experimental-require-module"
+
 [start]
-cmd = "node index.js"
+cmd = "node --experimental-require-module index.js"

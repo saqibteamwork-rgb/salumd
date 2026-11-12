@@ -1,4 +1,4 @@
-FROM node:20-bullseye-slim
+FROM node:22-bookworm-slim
 
 # Install system dependencies (ffmpeg is essential for WhatsApp stickers and audio/video conversions)
 RUN apt-get update && \
@@ -11,10 +11,15 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all npm dependencies
-RUN npm install
+RUN npm install --production=false
 
 # Copy application source code
 COPY . .
 
-# Start the bot
-CMD ["npm", "start"]
+ENV NODE_ENV=production
+ENV NODE_OPTIONS="--experimental-require-module"
+
+EXPOSE 3000
+
+# Start the bot with experimental ESM require support
+CMD ["node", "--experimental-require-module", "index.js"]

@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "Professional WhatsApp Automation Tool with Baileys",
   "main": "index.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "start": "node index.js",
+    "start": "node --experimental-require-module index.js",
     "pm2": "pm2 start ecosystem.config.js",
     "dev": "nodemon index.js"
   },
