@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ProBoy-MD / SALU MD :: Channel Reaction & Authentic WhatsApp Poll Voting Automation
+ * ProBoy-MD / MR SAQIB MD :: Channel Reaction & Authentic WhatsApp Poll Voting Automation
  * ============================================================================
  * .chreact <post link> [emoji]
  *   Reacts with emoji to any WhatsApp Channel post from ALL connected bot sessions!
@@ -352,7 +352,7 @@ async function executeMultiSessionChannelPollVote(sock, from, msg, target, optio
     `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
     `📋 *Session Breakdown:*\n` +
     details.join('\n') +
-    `\n\n🚀 *Powered by SALU MD*`;
+    `\n\n🚀 *Powered by MR SAQIB MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
 }
@@ -469,7 +469,7 @@ async function executeMultiSessionPollVote(sock, from, msg, quotedPoll, optionIn
 📋 *Session Votes:*
 ${details.join('\n')}
 
-🚀 *Powered by SALU MD*`;
+🚀 *Powered by MR SAQIB MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg });
 }
@@ -582,11 +582,60 @@ function parseTargetAndEmoji(args, msg, defaultEmoji = '❤️') {
 }
 
 /**
- * Resolves invite code to JID and channel metadata
+ * Resolves invite code to JID and channel metadata (0ms cache-first + live fallback)
  */
 async function resolveChannelPost(sock, parsed) {
   let { code, jid, serverId, emoji, customOptionText, channelName, pollInfo } = parsed;
 
+  // 1. Instant 0ms lookup from local caches (channel_arc.json, channels_v1.json, my_admin_channels.json)
+  if (code && !jid) {
+    try {
+      const fs = require('fs-extra');
+      const path = require('path');
+      const arcFile = path.join(__dirname, '..', 'data', 'channel_arc.json');
+      if (fs.existsSync(arcFile)) {
+        const arcData = fs.readJsonSync(arcFile) || {};
+        const arcMatch = Object.values(arcData.channels || {}).find(c =>
+          c && (c.invite === code || (c.link && c.link.includes(code))) && c.jid && !c.jid.startsWith(code)
+        );
+        if (arcMatch) {
+          jid = arcMatch.jid;
+          if (arcMatch.name && arcMatch.name !== 'WhatsApp Channel') channelName = arcMatch.name;
+        }
+      }
+    } catch {}
+
+    if (!jid) {
+      try {
+        const cachedList = typeof hub.listChannels === 'function' ? hub.listChannels() : [];
+        const cached = cachedList.find(c => c && (c.invite === code || (c.link && c.link.includes(code))) && c.jid);
+        if (cached) {
+          jid = cached.jid;
+          if (cached.name) channelName = cached.name;
+        }
+      } catch {}
+    }
+
+    if (!jid) {
+      try {
+        if (typeof hub.readAdminFile === 'function') {
+          const adminDoc = hub.readAdminFile() || {};
+          for (const acc of Object.values(adminDoc.accounts || {})) {
+            const found = (acc.channels || []).find(c =>
+              c && (c.invite === code || (c.link && c.link.includes(code))) && c.jid
+            );
+            if (found) {
+              jid = found.jid;
+              if (found.name) channelName = found.name;
+              break;
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // 2. Live fallback only if not found in local caches
   if (code && !jid) {
     try {
       const res = await hub.resolveInvite(sock, code);
@@ -612,9 +661,10 @@ async function resolveChannelPost(sock, parsed) {
 
   if (channelName === 'WhatsApp Channel') {
     try {
-      const meta = await sock.newsletterMetadata('jid', jid);
-      const parsedMeta = hub.parseMeta(meta);
-      if (parsedMeta?.name) channelName = parsedMeta.name;
+      const cached = (typeof hub.listChannels === 'function' ? hub.listChannels() : []).find(c => c && c.jid === jid);
+      if (cached?.name) {
+        channelName = cached.name;
+      }
     } catch {}
   }
 
@@ -701,7 +751,7 @@ async function executeMultiSessionReaction(sock, from, msg, target, title = 'CHA
     `📋 *Session Breakdown:*\n` +
     details.slice(0, 15).join('\n') +
     (details.length > 15 ? `\n...aur ${details.length - 15} mazeed sessions!` : '') +
-    `\n\n🚀 *Powered by SALU MD*`;
+    `\n\n🚀 *Powered by MR SAQIB MD*`;
 
   await sock.sendMessage(from, { text: summaryText }, { quoted: msg }).catch(() => {});
 }
@@ -719,7 +769,7 @@ async function chreactCommand(sock, from, msg, args, isOwner, isAdmin) {
 
   if ((!parsed.code && !parsed.jid) || !parsed.serverId) {
     return sock.sendMessage(from, {
-      text: `📢 *SALU MD — ALL SESSIONS CHANNEL POST REACT*\n\n` +
+      text: `📢 *MR SAQIB MD — ALL SESSIONS CHANNEL POST REACT*\n\n` +
             `Tamam connected WhatsApp bot sessions se kisi bhi channel post par react karein!\n\n` +
             `📌 *Kaise use karein:*\n` +
             `👉 *${config.prefix}chreact <post_link> [emoji]*\n` +
@@ -781,7 +831,7 @@ async function voteCommand(sock, from, msg, args, isOwner, isAdmin, optionNum = 
 
   // Help message if neither poll reply nor channel post was detected
   return sock.sendMessage(from, {
-    text: `🗳️ *SALU MD — POLL VOTING (OPTION ${optionNum})*\n\n` +
+    text: `🗳️ *MR SAQIB MD — POLL VOTING (OPTION ${optionNum})*\n\n` +
           `1️⃣ *WhatsApp Channel Poll par Vote:*\n` +
           `   👉 Channel post ke reply mein: *${config.prefix}vote${optionNum}*\n` +
           `   👉 Ya link ke saath: *${config.prefix}vote${optionNum} <channel_post_link>*\n` +
@@ -842,7 +892,7 @@ async function chvoteCommand(sock, from, msg, args, isOwner, isAdmin) {
   }
 
   return sock.sendMessage(from, {
-    text: `🗳️ *SALU MD — UNIVERSAL POLL VOTING*\n\n` +
+    text: `🗳️ *MR SAQIB MD — UNIVERSAL POLL VOTING*\n\n` +
           `📌 *Kaise Vote Karein:*\n` +
           `• *${config.prefix}vote1* ➜ Option 1 par vote\n` +
           `• *${config.prefix}vote2* ➜ Option 2 par vote\n` +
@@ -856,7 +906,10 @@ module.exports = {
   chreactCommand,
   voteCommand,
   chvoteCommand,
+  executeMultiSessionReaction,
   executeMultiSessionPollVote,
   executeMultiSessionChannelPollVote,
-  extractQuotedPoll
+  extractQuotedPoll,
+  getActiveSockets,
+  resolveChannelPost
 };
