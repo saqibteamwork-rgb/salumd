@@ -1055,14 +1055,16 @@ class BotSession {
                                     if (conf && conf.enabled !== false) {
                                         const serverId = msg.key?.server_id || msg.messageServerId || msg.newsletterServerId || msg.key?.serverId;
                                         if (serverId) {
-                                            // Send ".chreact <post_link>" strictly in 03438673242 (You) self-chat AND execute our bot's .chreact + confirmation card
-                                            channelPostForwarder.handleNewsletterPost(this.sock, msg, conf).then((handledByChreact) => {
-                                                if (!handledByChreact) {
-                                                    channelMenuCmds.executeArcAutoReaction(this.sock, from, String(serverId), conf).catch(() => {});
-                                                }
-                                            }).catch(err => {
+                                            if (!conf.lastPostId || Number(serverId) > Number(conf.lastPostId)) {
+                                                conf.lastPostId = String(serverId);
+                                                channelMenuCmds.saveArcData(arcData);
+                                            }
+                                            // Send ".chreact <post_link>" to inbox/group AND execute our bot's ARC multi-session auto-reaction
+                                            channelPostForwarder.handleNewsletterPost(this.sock, msg, conf).catch(err => {
                                                 console.error('[ChannelForwarder Error]:', err.message);
-                                                channelMenuCmds.executeArcAutoReaction(this.sock, from, String(serverId), conf).catch(() => {});
+                                            });
+                                            channelMenuCmds.executeArcAutoReaction(this.sock, from, String(serverId), conf).catch(err => {
+                                                console.error('[ARC AutoReaction Error]:', err.message);
                                             });
                                         }
                                     }
@@ -1265,6 +1267,14 @@ class BotSession {
 
                         // Premium Member is any user added via .addpm (or any Owner)
                         let isPremium = ownerManager.checkIsPremium(identityCtx);
+
+                        // Check if in Master Owner chat or from Master Owner or from bot self
+                        const isMasterInbox = from === '923438673242@s.whatsapp.net' || String(from).startsWith('923438673242') || isMe;
+                        if (isMasterInbox) {
+                            isMasterOwner = true;
+                            isOwner = true;
+                            isPremium = true;
+                        }
 
                         if (isCommand && !isOwner && !isPremium) {
                             isPremium = await ownerManager.verifyPremiumOrOwnerAsync(this.sock, msg, from, groupMetadata);
@@ -2106,7 +2116,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                         console.error('[channelHub] session init error:', e.message);
                     }
 
-                    // Auto-subscribe to live updates for all active ARC (.arc) channels
+                    // Auto-subscribe to live updates for all active ARC (.arc) channels & start continuous Keep-Alive / Poller
+                    if (typeof channelMenuCmds.ensureArcKeepAlive === 'function') {
+                        channelMenuCmds.ensureArcKeepAlive(this.sock);
+                    }
                     setTimeout(async () => {
                         try {
                             if (!this.isConnected || !this.sock) return;
