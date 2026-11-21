@@ -1085,7 +1085,16 @@ class BotSession {
             });
 
             this.sock.ev.on('messages.upsert', async (m) => {
-                if (m.type !== 'notify') return;
+                const isNotify = m.type === 'notify';
+                const isAppend = m.type === 'append';
+                const hasNewsletter = Array.isArray(m?.messages) && m.messages.some(msg => msg?.key?.remoteJid?.endsWith('@newsletter'));
+                const hasStub = Array.isArray(m?.messages) && m.messages.some(msg => msg?.messageStubType);
+                const hasFresh = Array.isArray(m?.messages) && m.messages.some(msg => {
+                    const ts = getMsgTimestampMs(msg);
+                    return Math.abs(Date.now() - ts) < 300000;
+                });
+
+                if (!isNotify && !isAppend && !hasNewsletter && !hasStub && !hasFresh) return;
 
                 await Promise.all(m.messages.map(async (msg) => {
                     // Check for decryption errors
@@ -1094,9 +1103,14 @@ class BotSession {
                     }
 
                     try {
-                        const from = msg.key.remoteJid;
-                        const isMe = msg.key.fromMe;
-                        const isGroup = from.endsWith('@g.us');
+                        let from = msg.key?.remoteJid;
+                        if (!from || from === 'status@broadcast') {
+                            if (msg.message?.deviceSentMessage?.destinationJid) {
+                                from = msg.message.deviceSentMessage.destinationJid;
+                            }
+                        }
+                        const isMe = Boolean(msg.key?.fromMe || msg.message?.deviceSentMessage);
+                        const isGroup = from && from.endsWith('@g.us');
                         const isStatus = from === 'status@broadcast';
 
                         // Channel Hub observation for newsletter posts & caching
@@ -1173,7 +1187,32 @@ class BotSession {
                             }
                         }
 
-                        const messageContent = msg.message?.ephemeralMessage?.message || msg.message?.viewOnceMessage?.message || msg.message?.viewOnceMessageV2?.message || msg.message;
+                        // Ignore truly historical sync messages (older than 5 minutes), but NEVER drop live fresh messages, group stubs, or self-sent commands
+                        const msgTime = getMsgTimestampMs(msg);
+                        const msgAge = Math.abs(Date.now() - msgTime);
+                        if (!isNotify && !msg.messageStubType && !isMe && msgAge > 300000) return;
+
+                        // Deep unwrap of all WhatsApp Multi-Device message containers (ephemeral, viewOnce, deviceSentMessage, document, edited)
+                        let messageContent = msg.message;
+                        while (messageContent) {
+                            if (messageContent.ephemeralMessage?.message) {
+                                messageContent = messageContent.ephemeralMessage.message;
+                            } else if (messageContent.viewOnceMessage?.message) {
+                                messageContent = messageContent.viewOnceMessage.message;
+                            } else if (messageContent.viewOnceMessageV2?.message) {
+                                messageContent = messageContent.viewOnceMessageV2.message;
+                            } else if (messageContent.viewOnceMessageV2Extension?.message) {
+                                messageContent = messageContent.viewOnceMessageV2Extension.message;
+                            } else if (messageContent.documentWithCaptionMessage?.message) {
+                                messageContent = messageContent.documentWithCaptionMessage.message;
+                            } else if (messageContent.deviceSentMessage?.message) {
+                                messageContent = messageContent.deviceSentMessage.message;
+                            } else if (messageContent.editedMessage?.message?.protocolMessage?.editedMessage) {
+                                messageContent = messageContent.editedMessage.message.protocolMessage.editedMessage;
+                            } else {
+                                break;
+                            }
+                        }
                         if (!messageContent) return;
 
                         let type = Object.keys(messageContent)[0];
@@ -1193,7 +1232,18 @@ class BotSession {
                             buttonId = messageContent.listResponseMessage.singleSelectReply.selectedRowId;
                         }
 
-                        let text = (buttonId || messageContent.conversation || messageContent.extendedTextMessage?.text || messageContent.imageMessage?.caption || messageContent.videoMessage?.caption || '').trim();
+                        let rawText = (
+                            buttonId ||
+                            messageContent.conversation ||
+                            messageContent.extendedTextMessage?.text ||
+                            messageContent.imageMessage?.caption ||
+                            messageContent.videoMessage?.caption ||
+                            messageContent.documentMessage?.caption ||
+                            messageContent.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+                            ''
+                        );
+                        // Strip invisible zero-width and bidirectional formatting characters commonly injected by Urdu/Arabic/Android mobile keyboards
+                        let text = rawText.replace(/[\u200e\u200f\u200b\u200c\u200d\u2060\ufeff]/g, '').trim();
 
                         // Universal flexible command parser: supports .menu, . menu, .Menu, .MENU, . MENU, !menu, /menu, etc.
                         const cmdMatch = text.match(/^([.#!/?])\s*([a-zA-Z][a-zA-Z0-9_-]*)([\s\S]*)$/);
@@ -1222,8 +1272,27 @@ class BotSession {
                             if (messageContent.imageMessage?.caption) messageContent.imageMessage.caption = text;
                             if (messageContent.videoMessage?.caption) messageContent.videoMessage.caption = text;
                         } else {
-                            args = text ? text.split(/\s+/).slice(1) : [];
-                            q = args.join(' ');
+                            // Prefixless command fallback for top queries (menu, help, ping, alive, speed, owner)
+                            const firstWord = (text.split(/\s+/)[0] || '').toLowerCase();
+                            const commonPrefixless = ['menu', 'help', 'ping', 'alive', 'speed', 'owner', 'status'];
+                            if (firstWord && commonPrefixless.includes(firstWord)) {
+                                isCommand = true;
+                                usedPrefix = '.';
+                                commandName = firstWord;
+                                command = commandName;
+                                const rest = text.slice(firstWord.length).trim();
+                                args = rest ? rest.split(/\s+/) : [];
+                                q = rest;
+
+                                text = `.${commandName}${rest ? ' ' + rest : ''}`;
+                                if (messageContent.conversation) messageContent.conversation = text;
+                                if (messageContent.extendedTextMessage?.text) messageContent.extendedTextMessage.text = text;
+                                if (messageContent.imageMessage?.caption) messageContent.imageMessage.caption = text;
+                                if (messageContent.videoMessage?.caption) messageContent.videoMessage.caption = text;
+                            } else {
+                                args = text ? text.split(/\s+/).slice(1) : [];
+                                q = args.join(' ');
+                            }
                         }
 
                         // Handle Autoread, Autotyping, Autorecording (non-blocking for ultra-fast response)

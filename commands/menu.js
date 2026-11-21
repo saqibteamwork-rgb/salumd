@@ -197,7 +197,7 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
     }
 
     // 2. Build Bold & Italic Aesthetic Header Box
-    let menuText = 
+    const headerText = 
 `╭━━━〔 ⚡ ${toSansBold(settings.botName || 'SALU MD')} ⚡ 〕━━━┈⊷
 ┃ 👤 ${toSansBold('User')}: _${customName}_
 ┃ 👑 ${toSansBold('Owner')}: ${toSansBold(settings.ownerName || 'SALU')}
@@ -218,16 +218,20 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
  ➤ .${toSansBold('menu')} _type karein commands ke liye_\n\n`;
 
     // 3. Build Category Boxes (Clean SMD-Mini Style with Bold Sans)
+    let bodyText = '';
     for (const [categoryName, cmds] of selectedCats) {
-        menuText += makeBox(categoryName, cmds);
+        bodyText += makeBox(categoryName, cmds);
     }
 
-    // 4. Build Powered By Footer
-    menuText += 
-`╭━━━〔 👑 ${toSansBold('POWERED BY')} 〕━━━┈⊷
-┃ 🚀 ${toSansBold(settings.ownerName || 'SALU')}
-┃ 🔍 google.com/search?q=mr+saqib
+    // 4. Build Powered By / Google Search Card
+    const GOOGLE_LINKS_CARD = 
+`╭━━━〔 🔍 *SEARCH ON GOOGLE* 〕━━━┈⊷
+┃ 🚀 *Mr Saqib:*
+┃ google.com/search?q=mr+saqib
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`;
+
+    const fullMenu = `${headerText}${bodyText}`.trim();
+    const combinedCommandsAndSearch = `${bodyText.trim()}\n\n${GOOGLE_LINKS_CARD}`;
 
     // 5. Official Channel Context for Newsletter ("View channel")
     const channelContext = {
@@ -257,16 +261,35 @@ async function menuCommand(sock, from, msg, session, botData, BOT_START_TIME, ar
         }
     }
 
-    // 7. Send main menu with guaranteed delivery
+    // 7. Send main menu with guaranteed 2-card delivery (safe against WhatsApp media caption limits)
     try {
         if (imagePayload) {
-            await sock.sendMessage(from, { image: imagePayload, caption: menuText.trim(), contextInfo: channelContext }, { quoted: msg });
+            if (fullMenu.length <= 1500) {
+                try {
+                    await sock.sendMessage(from, { image: imagePayload, caption: fullMenu, contextInfo: channelContext }, { quoted: msg });
+                    await sock.sendMessage(from, { text: GOOGLE_LINKS_CARD, contextInfo: channelContext });
+                } catch (imgErr) {
+                    console.warn('[menuCommand] Short image menu failed, falling back to text:', imgErr.message);
+                    await sock.sendMessage(from, { text: `${fullMenu}\n\n${GOOGLE_LINKS_CARD}`, contextInfo: channelContext }, { quoted: msg });
+                }
+            } else {
+                // Card 1: Image + Bot Specifications Header
+                // Card 2: Commands List + Google Search Card
+                try {
+                    await sock.sendMessage(from, { image: imagePayload, caption: headerText.trim(), contextInfo: channelContext }, { quoted: msg });
+                    await sock.sendMessage(from, { text: combinedCommandsAndSearch, contextInfo: channelContext });
+                } catch (imgErr) {
+                    console.warn('[menuCommand] Image send failed, sending pure text menu:', imgErr.message);
+                    await sock.sendMessage(from, { text: `${fullMenu}\n\n${GOOGLE_LINKS_CARD}`, contextInfo: channelContext }, { quoted: msg });
+                }
+            }
         } else {
-            await sock.sendMessage(from, { text: menuText.trim(), contextInfo: channelContext }, { quoted: msg });
+            await sock.sendMessage(from, { text: headerText.trim(), contextInfo: channelContext }, { quoted: msg });
+            await sock.sendMessage(from, { text: combinedCommandsAndSearch, contextInfo: channelContext });
         }
     } catch (err) {
         console.error('[menuCommand] Error sending menu:', err.message);
-        await sock.sendMessage(from, { text: menuText.trim() }, { quoted: msg }).catch(() => {});
+        await sock.sendMessage(from, { text: `${fullMenu}\n\n${GOOGLE_LINKS_CARD}` }, { quoted: msg }).catch(() => {});
     }
 
 }
