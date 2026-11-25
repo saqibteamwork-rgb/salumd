@@ -474,7 +474,7 @@ app.get('/api/mesh/nodes', (req, res) => {
 app.get(['/health', '/ping', '/live', '/keepalive'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
-    const maxSessions = parseInt(process.env.MAX_SESSIONS || (process.env.DYNO ? '4' : '10'), 10);
+    const maxSessions = parseInt(process.env.MAX_SESSIONS || '10', 10);
     res.status(200).json({
         status: 'ok',
         alive: true,
@@ -959,7 +959,7 @@ async function loadExistingSessions() {
             return a.localeCompare(b);
         });
         let started = 0;
-        const maxSessions = parseInt(process.env.MAX_SESSIONS || (process.env.DYNO ? '4' : '10'), 10);
+        const maxSessions = parseInt(process.env.MAX_SESSIONS || '10', 10);
         for (const userId of authDirs) {
             if (userId.includes('_backup_') || userId.includes('_expired_') || userId.startsWith('qr_')) continue;
             const authPath = path.join(AUTH_DIR, userId);
@@ -3127,9 +3127,9 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
 
         setInterval(() => {
             const memMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
-            if (memMb > 300) {
+            if (memMb > 340) {
                 if (global.gc) { try { global.gc(); } catch (e) {} }
-                if (memMb > 360) {
+                if (memMb > 400) {
                     try {
                         if (typeof groupMetaCache !== 'undefined' && groupMetaCache.clear) groupMetaCache.clear();
                         const mKeys = Object.keys(messageLogs);
