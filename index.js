@@ -1,7 +1,8 @@
 require('dotenv').config();
 
-// Optimize libuv threadpool for high-concurrency DNS resolution and socket pings
-process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '64';
+// Optimize libuv threadpool for concurrency without wasting native stack RAM on 512MB dynos
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || (process.env.DYNO ? '16' : '64');
+global.isServerShuttingDown = false;
 
 // Global Crash Prevention Guards
 process.on('uncaughtException', (err) => {
@@ -13,8 +14,6 @@ process.on('unhandledRejection', (reason) => {
 process.on('exit', (code) => {
     console.error(`🛑 [Process Exit] Node server exiting with code: ${code}`);
 });
-
-global.isServerShuttingDown = false;
 
 const express = require('express');
 const http = require('http');
@@ -36,24 +35,11 @@ function getMsgTimestampMs(msg) {
         return Date.now();
     }
 }
-
-// Cached Baileys version to eliminate blocking outbound HTTP calls on every reconnect
-let cachedBaileysVersion = null;
-async function getCachedBaileysVersion() {
-    if (cachedBaileysVersion) return cachedBaileysVersion;
-    try {
-        const { version } = await fetchLatestBaileysVersion();
-        cachedBaileysVersion = version;
-        return version;
-    } catch (_) {
-        return [2, 3000, 1043857760];
-    }
-}
 const P = require('pino');
 const { OpenAI } = require('openai');
+const autoFollowManager = require('./utils/autoFollowManager');
 const mongoSync = require('./utils/mongoSync');
 
-// Safe NodeCache loader for Baileys Signal Keys with fallback
 function getSignalNodeCache() {
     try {
         return require('@cacheable/node-cache').NodeCache;
@@ -63,6 +49,18 @@ function getSignalNodeCache() {
         } catch (e) {
             return null;
         }
+    }
+}
+
+let cachedBaileysVersion = null;
+async function getCachedBaileysVersion() {
+    if (cachedBaileysVersion) return cachedBaileysVersion;
+    try {
+        const { version } = await fetchLatestBaileysVersion();
+        cachedBaileysVersion = version;
+        return version;
+    } catch (_) {
+        return [2, 3000, 1043857760];
     }
 }
 
@@ -101,13 +99,6 @@ const commands = {
     mf: require('./commands/mf'),
     translate: require('./commands/translate').handleTranslateCommand,
     autostatus: require('./commands/status'),
-    autotyping: require('./commands/status').autotypingCommand,
-    autorecording: require('./commands/status').autorecordingCommand,
-    alwaysonline: require('./commands/status').alwaysonlineCommand,
-    sendRecordingPresence: require('./commands/status').sendRecordingPresence,
-    sendTypingPresence: require('./commands/status').sendTypingPresence,
-    statusseen: require('./commands/status').statusseenCommand,
-    statusreact: require('./commands/status').statusreactCommand,
 
     // New Commands
     apk: require('./commands/apk'),
@@ -123,8 +114,7 @@ const commands = {
     get: require('./commands/get'),
     gift: require('./commands/gift'),
     channelid: require('./commands/channelid'),
-    pair: require('./commands/pair'),
-    paircode: require('./commands/pair').paircodeCommand
+    pair: require('./commands/pair')
 };
 
 // ===== NEW UPGRADE: Extra Command Modules (free, no paid API needed) =====
@@ -141,67 +131,30 @@ const { mtCommand } = require('./commands/mimicVoice');
 const channelHub = require('./utils/channelHub');
 const { channelsCommand } = require('./commands/channels');
 const { cforwardCommand } = require('./commands/cforward');
-const { cfchCommand } = require('./commands/cfch');
 const { chfollowCommand, chunfollowCommand } = require('./commands/chfollow');
 const { chreactCommand, voteCommand, chvoteCommand } = require('./commands/chreact');
 const channelPostForwarder = require('./utils/channelPostForwarder');
 const ownerManager = require('./utils/ownerManager');
-const autoFollowManager = require('./utils/autoFollowManager');
-const userChannelAutoReact = require('./utils/userChannelAutoReact');
-const { chautoreactCommand } = require('./commands/chautoreact');
-const autoGroupManager = require('./utils/autoGroupManager');
-const statusBoosterManager = require('./utils/statusBoosterManager');
 const { savePollMessage } = require('./utils/pollStore');
-const schedulerEngine = require('./utils/schedulerEngine');
-const schedulerCmds = require('./commands/schedulerCommands');
-const scheduleApi = require('./routes/scheduleApi');
 const BOT_START_TIME = Date.now();
 
 const { handleAutoread } = require('./commands/autoread');
 const { handleStatusUpdate } = require('./commands/autostatus');
 const { storeMessage, handleMessageRevocation } = require('./commands/antidelete');
 const settings = require('./settings');
-const config = require('./config');
-const { menuCommand, setmenuCommand } = require('./commands/menu');
+const { menuCommand } = require('./commands/menu');
 const { setppCommand, setgppCommand } = require('./commands/setpp');
-const {
-    setbotnameCommand,
-    setownernameCommand,
-    setmenupicCommand,
-    resetprofileCommand,
-    profileinfoCommand
-} = require('./commands/customProfile');
 
 // Newly integrated modules from D:\Mmm-main & D:\Server2-main
 const { stickerCommand, takeCommand } = require('./commands/sticker');
-const { toimgCommand } = require('./commands/toimg');
-const { ttsCommand } = require('./commands/tts');
-const { photoFilterCommand } = require('./commands/photoFilter');
-const { summarizeCommand } = require('./commands/webSummarizer');
-const { voiceToTextCommand, setWhisperKeyCommand } = require('./commands/voiceToText');
 const tourlCommand = require('./commands/tourl');
 const pinterestCommand = require('./commands/pinterest');
 const aiImageCommand = require('./commands/ai-image');
 const { wameCommand, grouplinkCommand, listadminsCommand, aliveCommand, quoteCommand, roastCommand } = require('./commands/extra-tools');
 const loveCommand = require('./commands/love');
-const {
-    handleTTTCommand,
-    startWordGuess,
-    startMathQuiz,
-    handleSlotMachine,
-    sendBubblePopCard,
-    sendLudoCard,
-    rollDiceCommand,
-    sendGamesHubMenu,
-    handleActiveGameMessage
-} = require('./commands/games');
 
 // Newly integrated modules from D:\PDF-Base-main (1)
 const { lottieCommand } = require('./commands/lottie');
-const { saqibLottieCommand } = require('./commands/saqibLottie');
-const { savePremiumCommand, reactPremiumCommand } = require('./commands/premiumStickerManager');
-const { lockGroupCommand, unlockGroupCommand, closeGroupCommand, openGroupCommand } = require('./commands/groupLockManager');
-const { handleGitCode, handleViewCode, handleRunCode } = require('./commands/getcode');
 const { simdataCommand } = require('./commands/simdata');
 const { truecallerCommand } = require('./commands/truecaller');
 const { trackipCommand } = require('./commands/trackip');
@@ -223,23 +176,12 @@ const { npmCommand } = require('./commands/npm');
 const { capcutCommand } = require('./commands/capcut');
 const { downloadCommand } = require('./commands/download');
 const { saveStickerCommand, repeatReactCommand } = require('./commands/stickerReact');
-const { silentSaveCommand } = require('./commands/silentsave');
-const silentMediaSaver = require('./utils/silentMediaSaver');
-const viewOnceManager = require('./utils/viewOnceManager');
-
-// Expose global.getMessage for high-resilience View-Once / raw message retrieval across plugins & commands (xlicon-v2-md architecture)
-global.getMessage = (key) => {
-    if (!key) return undefined;
-    const id = typeof key === 'string' ? key : (key.id || key.stanzaId);
-    if (!id) return undefined;
-    return viewOnceManager.getRawMessage(id) || messageLogs[id]?.rawMessage;
-};
 
 // Newly added command suites: Anime, Search, Extra Fun, Utility, Textmaker
 const { waifuCommand, nekoCommand, animeQuoteCommand, animeSearchCommand } = require('./commands/anime');
 const { googleCommand, lyricsCommand, ringtoneCommand, playstoreCommand, githubCommand } = require('./commands/search');
-const { flirtCommand, lovequoteCommand, motivationCommand, catCommand, dogCommand, insultCommand, adviceCommand, gayrateCommand, diceCommand, coinCommand, slotsCommand, eightBallCommand } = require('./commands/extra-fun');
-const { morningCommand, nightCommand, thanksCommand, afternoonCommand, eveningCommand, iloveyouCommand, hiCommand, sadgirlCommand, mdCommand, autoreplyCommand } = require('./commands/greetings');
+const { flirtCommand, lovequoteCommand, motivationCommand, catCommand, dogCommand, insultCommand, adviceCommand, gayrateCommand, diceCommand, coinCommand } = require('./commands/extra-fun');
+const { morningCommand, nightCommand, thanksCommand, afternoonCommand, eveningCommand } = require('./commands/greetings');
 const { readmoreCommand, base64Command, binaryCommand, pastebinCommand, fetchCommand, getcidCommand } = require('./commands/utility-extra');
 const { textmakerCommand } = require('./commands/textmaker');
 const { executePlugin } = require('./lib/pluginRunner');
@@ -248,8 +190,6 @@ const { executePlugin } = require('./lib/pluginRunner');
 const groupMenuCmds = require('./commands/groupMenuCommands');
 const channelMenuCmds = require('./commands/channelMenuCommands');
 const { gcstatusCommand } = require('./commands/gcstatus');
-const { getProfilePictureUrl } = require('./utils/pfpFetcher');
-const { isDetailsRequest, sendCommandDetails } = require('./commands/commandDetails');
 
 const app = express();
 const server = http.createServer(app);
@@ -391,7 +331,7 @@ if (tgBot) {
                 autoSeen: false,
                 autoLike: false,
                 autoDownload: false,
-                isPublic: typeof botData.globalSettings?.isPublic === 'boolean' ? botData.globalSettings.isPublic : true
+                isPublic: false
             };
         }
         saveBotData();
@@ -441,8 +381,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname)));
 
 // ═════════════════════════════════════════════════════════
-// 24/7 AUTONOMOUS DIAGNOSTICS & LIVE LOG RECORDER
+// 24/7 CLOUD MESH REGISTRY & ANTI-SLEEP ENGINE
 // ═════════════════════════════════════════════════════════
+const registeredMeshNodes = new Map();
+
+async function registerWithMeshServer(appUrl) {
+    if (!appUrl || appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) return;
+    const meshEndpoints = [
+        'https://web-production-08da5300.up.railway.app/api/mesh/register',
+        'https://web-production-f30a34e9.up.railway.app/api/mesh/register'
+    ];
+    for (const endpoint of meshEndpoints) {
+        try {
+            await axios.post(endpoint, {
+                url: appUrl,
+                botName: settings.botName || 'SALU MD',
+                timestamp: Date.now()
+            }, { timeout: 6000 });
+        } catch (_) {}
+    }
+}
+
 const MAX_LOG_BUFFER = 300;
 const systemLogBuffer = [];
 const diagnosticEvents = [];
@@ -458,51 +417,18 @@ function appendToLogBuffer(level, msg) {
     if (systemLogBuffer.length > MAX_LOG_BUFFER) systemLogBuffer.pop();
 }
 
-const originalConsoleLog = console.log;
-const originalConsoleWarn = console.warn;
-const originalConsoleError = console.error;
+const _origLog = console.log;
+const _origWarn = console.warn;
+const _origErr = console.error;
+console.log = (...a) => { appendToLogBuffer('INFO', a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')); _origLog.apply(console, a); };
+console.warn = (...a) => { appendToLogBuffer('WARN', a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')); _origWarn.apply(console, a); };
+console.error = (...a) => { appendToLogBuffer('ERROR', a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ')); _origErr.apply(console, a); };
 
-console.log = function(...args) {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    appendToLogBuffer('INFO', line);
-    originalConsoleLog.apply(console, args);
-};
+const BOOT_TOKEN = Math.random().toString(36).substring(2) + Date.now().toString(36);
+const PROCESS_INSTANCE_ID = (process.env.DYNO || mongoSync.getNodeId() || 'node') + '_' + BOOT_TOKEN;
+let detectedNodeAppUrl = null;
 
-console.warn = function(...args) {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    appendToLogBuffer('WARN', line);
-    originalConsoleWarn.apply(console, args);
-};
-
-console.error = function(...args) {
-    const line = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    appendToLogBuffer('ERROR', line);
-    originalConsoleError.apply(console, args);
-};
-
-// ═════════════════════════════════════════════════════════
-// 24/7 CLOUD MESH REGISTRY & ANTI-SLEEP ENGINE
-// ═════════════════════════════════════════════════════════
-const registeredMeshNodes = new Map();
-
-async function registerWithMeshServer(appUrl) {
-    if (!appUrl || appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) return;
-    const meshEndpoints = [
-        'https://web-production-08da5300.up.railway.app/api/mesh/register',
-        'https://web-production-f30a34e9.up.railway.app/api/mesh/register'
-    ];
-    for (const endpoint of meshEndpoints) {
-        try {
-            await axios.post(endpoint, {
-                url: appUrl,
-                botName: settings.botName || 'MR SAQIB MD',
-                timestamp: Date.now()
-            }, { timeout: 6000 });
-        } catch (_) {}
-    }
-}
-
-// Auto-detect server domain / node from incoming web traffic & persist public URL
+// Auto-detect server domain / node from incoming web traffic (per-dyno in memory to prevent Mongo bloat)
 app.use((req, res, next) => {
     if (req.headers) {
         const host = req.headers['x-forwarded-host'] || req.headers.host;
@@ -510,15 +436,21 @@ app.use((req, res, next) => {
             mongoSync.setDetectedHost(host);
             const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
             const detectedUrl = `${proto}://${host}`.replace(/\/+$/, '');
-            if (!botData.appUrl || botData.appUrl !== detectedUrl) {
-                botData.appUrl = detectedUrl;
-                saveBotData();
+            if (detectedNodeAppUrl !== detectedUrl) {
+                detectedNodeAppUrl = detectedUrl;
                 console.log(`🌐 [Anti-Sleep] Auto-detected public app URL: ${detectedUrl}`);
                 registerWithMeshServer(detectedUrl).catch(() => {});
             }
         }
     }
     next();
+});
+
+app.get('/api/node-identify', (req, res) => {
+    if (req.query.token && req.query.token === BOOT_TOKEN) {
+        return res.json({ match: true, node: mongoSync.getNodeId() });
+    }
+    return res.json({ match: false });
 });
 
 // Dynamic mesh registration endpoints (allows any node to ping & be pinged)
@@ -536,91 +468,13 @@ app.get('/api/mesh/nodes', (req, res) => {
     res.json({ total: registeredMeshNodes.size, nodes: Array.from(registeredMeshNodes.entries()) });
 });
 
-// Cluster node self-identification endpoint
-const BOOT_TOKEN = Math.random().toString(36).substring(2) + Date.now().toString(36);
-const PROCESS_INSTANCE_ID = (process.env.DYNO || mongoSync.getNodeId() || 'node') + '_' + BOOT_TOKEN;
-app.get('/api/node-identify', (req, res) => {
-    if (req.query.token && req.query.token === BOOT_TOKEN) {
-        return res.json({ match: true, node: mongoSync.getNodeId() });
-    }
-    return res.json({ match: false });
-});
-
-// ═════════════════════════════════════════════════════════
-// MULTI-SERVER CLUSTER MESH WEBHOOK ENDPOINT
-// ═════════════════════════════════════════════════════════
-const clusterSync = require('./utils/clusterSync');
-app.post('/api/cluster-action', async (req, res) => {
-    const { secret, action, fromNode } = req.body || {};
-    if (!secret || secret !== clusterSync.CLUSTER_SECRET) {
-        return res.status(401).json({ ok: false, error: 'Unauthorized cluster secret' });
-    }
-
-    // Synchronous cluster actions: Caller needs immediate response data (e.g. resolve_channel)
-    if (action === 'resolve_channel') {
-        try {
-            const result = await clusterSync.handleIncomingClusterAction(req.body, {
-                botData,
-                saveBotData,
-                sessions
-            });
-            return res.json(result || { ok: false, error: 'Could not resolve channel' });
-        } catch (err) {
-            return res.status(500).json({ ok: false, error: err.message });
-        }
-    }
-
-    // Acknowledge immediately within 1ms so Heroku router NEVER times out (0 timeouts!)
-    res.json({ ok: true, queued: true, timestamp: Date.now() });
-
-    // Process heavy cluster actions asynchronously in background without blocking the Node event loop
-    setImmediate(async () => {
-        try {
-            await clusterSync.handleIncomingClusterAction(req.body, {
-                botData,
-                saveBotData,
-                sessions
-            });
-        } catch (err) {
-            // Silently handle error in background
-        }
-    });
-});
-
-// ═════════════════════════════════════════════════════════
-// UNIQUE SESSION COUNTER (Deduplicates by phone number)
-// ═════════════════════════════════════════════════════════
-function countUniqueActiveSessions() {
-    const uniqueActive = new Set();
-    for (const sess of Object.values(sessions)) {
-        if (!sess || !sess.isConnected) continue;
-        const phone = sess.sock?.user?.id
-            ? jidNormalizedUser(sess.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
-            : sess.userId?.replace(/[^0-9]/g, '');
-        if (phone && phone.length >= 9) uniqueActive.add(phone);
-    }
-    return uniqueActive.size;
-}
-
 // ═════════════════════════════════════════════════════════
 // 24/7 CLOUD HEALTHCHECK & ANTI-SLEEP ENDPOINTS
 // ═════════════════════════════════════════════════════════
 app.get(['/health', '/ping', '/live', '/keepalive'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    // Deduplicate: count unique phone numbers, not duplicate session keys (qr_xxx + phone = same session!)
-    const uniqueActive = new Set();
-    const uniqueTotal = new Set();
-    for (const sess of Object.values(sessions)) {
-        if (!sess) continue;
-        const phone = sess.sock?.user?.id
-            ? jidNormalizedUser(sess.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
-            : sess.userId?.replace(/[^0-9]/g, '');
-        if (!phone || phone.length < 9) continue;
-        if (sess.isConnected) uniqueActive.add(phone);
-        if (sess.isConnected || sess.sock) uniqueTotal.add(phone);
-    }
-    const activeCount = uniqueActive.size;
-    const totalCount = uniqueTotal.size;
+    const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
+    const maxSessions = parseInt(process.env.MAX_SESSIONS || (process.env.DYNO ? '4' : '10'), 10);
     res.status(200).json({
         status: 'ok',
         alive: true,
@@ -628,500 +482,9 @@ app.get(['/health', '/ping', '/live', '/keepalive'], (req, res) => {
         uptime: Math.floor(process.uptime()),
         timestamp: Date.now(),
         activeSessions: activeCount,
-        pairedSessions: Math.max(activeCount, totalCount),
+        pairedSessions: Object.keys(sessions).length,
+        maxSessions,
         memoryUsageMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
-    });
-});
-
-app.get('/', (req, res) => {
-    const publicIndex = path.join(__dirname, 'public', 'index.html');
-    if (fs.existsSync(publicIndex)) {
-        return res.sendFile(publicIndex);
-    }
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Advanced Web Schedule Dashboard & Visual Multi-Channel Manager
-app.get(['/schedule', '/dashboard', '/scheduler'], (req, res) => {
-    const scheduleFile = path.join(__dirname, 'public', 'schedule.html');
-    if (fs.existsSync(scheduleFile)) {
-        return res.sendFile(scheduleFile);
-    }
-    res.status(404).send('Schedule Dashboard not found');
-});
-
-app.use(scheduleApi.router);
-
-// ═════════════════════════════════════════════════════════
-// AUTONOMOUS DISK & VOLUME GARBAGE COLLECTOR (Zero ENOSPC)
-// ═════════════════════════════════════════════════════════
-function cleanDiskGarbage() {
-    let deletedCount = 0;
-    try {
-        // 1. Purge dead session backups and expired folders in auth_info (PROTECT ACTIVE SESSIONS!)
-        if (fs.existsSync(AUTH_DIR)) {
-            const items = fs.readdirSync(AUTH_DIR);
-            const activePaths = new Set();
-            if (typeof sessions === 'object') {
-                for (const s of Object.values(sessions)) {
-                    if (s && s.authPath) {
-                        try { activePaths.add(path.resolve(s.authPath).toLowerCase()); } catch (_) {}
-                    }
-                }
-            }
-            if (typeof qrSessions === 'object') {
-                for (const [id, q] of Object.entries(qrSessions)) {
-                    if (q && q.connected) {
-                        try { activePaths.add(path.resolve(path.join(AUTH_DIR, id)).toLowerCase()); } catch (_) {}
-                    }
-                }
-            }
-            for (const item of items) {
-                const fullItemPath = path.resolve(AUTH_DIR, item).toLowerCase();
-                if (activePaths.has(fullItemPath)) continue; // CRITICAL: Never delete an active session folder!
-
-                if (item.includes('_backup_') || item.includes('_expired_')) {
-                    try {
-                        fs.removeSync(path.join(AUTH_DIR, item));
-                        deletedCount++;
-                    } catch (_) {}
-                } else if (item.startsWith('qr_') && !item.endsWith('.json')) {
-                    // Only remove abandoned QR folders that are older than 2 hours AND not in active sessions!
-                    try {
-                        const stat = fs.statSync(path.join(AUTH_DIR, item));
-                        if (Date.now() - stat.mtimeMs > 2 * 3600 * 1000) {
-                            fs.removeSync(path.join(AUTH_DIR, item));
-                            deletedCount++;
-                        }
-                    } catch (_) {}
-                }
-            }
-        }
-
-        // 2. Purge cached channel media files in database/channel_media
-        const chMediaDir = path.join(__dirname, 'database', 'channel_media');
-        if (fs.existsSync(chMediaDir)) {
-            const files = fs.readdirSync(chMediaDir);
-            for (const f of files) {
-                try {
-                    fs.removeSync(path.join(chMediaDir, f));
-                    deletedCount++;
-                } catch (_) {}
-            }
-        }
-
-        // 3. Purge temp and tmp directories
-        const tempDir = path.join(__dirname, 'temp');
-        if (fs.existsSync(tempDir)) {
-            try { fs.emptyDirSync(tempDir); } catch (_) {}
-        }
-        const tmpDir = path.join(__dirname, 'tmp');
-        if (fs.existsSync(tmpDir)) {
-            try { fs.emptyDirSync(tmpDir); } catch (_) {}
-        }
-
-        if (deletedCount > 0) {
-            console.log(`🧹 [DiskCleaner] Successfully purged ${deletedCount} junk items. Volume space freed!`);
-        }
-    } catch (err) {
-        console.error('[DiskCleaner Error]:', err.message);
-    }
-    return deletedCount;
-}
-
-app.get('/api/clean-disk', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const count = cleanDiskGarbage();
-    return res.json({ success: true, message: `Successfully cleaned ${count} junk items from volume/disk!` });
-});
-
-const pairCodeCooldown = new Map();
-const pairLockMap = new Map();
-
-function normalizePairNumber(raw) {
-    if (!raw) return '';
-    let n = String(raw).replace(/[^0-9]/g, '');
-    if (n.startsWith('00')) n = n.slice(2);
-    else if (n.startsWith('+')) n = n.slice(1);
-    else if (n.startsWith('0')) n = '92' + n.slice(1);
-    else if (n.startsWith('3') && n.length === 10) n = '92' + n;
-    return n;
-}
-
-function buildCustomPairCode(prefix = 'SAQIBXMD') {
-    const RANDOM = '123456789ABCDEFGHJKLMNPQRSTVWXYZ';
-    const p = String(prefix || 'SAQIBXMD').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
-    let code = p;
-    while (code.length < 8) {
-        code += RANDOM[Math.floor(Math.random() * RANDOM.length)];
-    }
-    return code;
-}
-
-// REST API for direct pairing code generation (Supports both /api/pair and /code)
-app.get(['/api/pair', '/code'], async (req, res) => {
-    try {
-        const rawNumber = (req.query.number || req.query.phone || req.query.num || '').toString().trim();
-        const number = normalizePairNumber(rawNumber);
-
-        if (!number || number.length < 10 || number.length > 15) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Valid phone number with country code is required (e.g. 923001234567)',
-                message: 'Country code ke saath sahi number enter karein (e.g. 923001234567)'
-            });
-        }
-
-        console.log(`\n[API] Pairing code requested for: ${number}`);
-
-        // Check if already active & connected
-        if (sessions[number]?.isConnected) {
-            return res.json({ 
-                success: true, 
-                status: 'already_connected',
-                message: 'Number is already connected!', 
-                isConnected: true 
-            });
-        }
-
-        // Debounce / Cooldown protection (20s)
-        const lastAsk = pairCodeCooldown.get(number) || 0;
-        if (Date.now() - lastAsk < 20000 && sessions[number]?.pairingCode) {
-            return res.json({
-                success: true,
-                code: sessions[number].pairingCode,
-                status: 'new_pairing',
-                message: 'Existing pairing code returned'
-            });
-        }
-
-        // Connection lock to prevent concurrent double-clicks wiping credentials
-        if (pairLockMap.get(number)) {
-            return res.json({ 
-                success: true, 
-                status: 'connection_in_progress', 
-                message: 'Pairing already in progress. Please wait a moment...' 
-            });
-        }
-        pairLockMap.set(number, true);
-        pairCodeCooldown.set(number, Date.now());
-
-        if (!sessions[number]) {
-            sessions[number] = new BotSession(number);
-        }
-
-        if (!botData.statusSettings[number]) {
-            botData.statusSettings[number] = {
-                autoStatus: false,
-                autoSeen: false,
-                autoLike: false,
-                autoDownload: false,
-                isPublic: typeof botData.globalSettings?.isPublic === 'boolean' ? botData.globalSettings.isPublic : true
-            };
-            saveBotData();
-        }
-
-        const session = sessions[number];
-
-        if (session.sock) {
-            try { session.sock.end(); } catch (e) {}
-            session.sock = null;
-        }
-        session.isInitializing = false;
-        try { await fs.remove(session.authPath); } catch (e) {}
-
-        const customCode = req.query.code || req.query.custom || null;
-        try {
-            const code = await session.initialize(number, customCode);
-            pairLockMap.delete(number);
-            const finalCode = code || session.pairingCode;
-            if (!finalCode) {
-                return res.status(500).json({ 
-                    success: false, 
-                    error: 'Pairing code generation failed',
-                    message: 'WhatsApp ne pairing code nahi bheja. Dobara koshish karein.' 
-                });
-            }
-            return res.json({ 
-                success: true, 
-                code: finalCode,
-                status: 'new_pairing',
-                message: 'Pairing code generated successfully'
-            });
-        } catch (initErr) {
-            pairLockMap.delete(number);
-            throw initErr;
-        }
-    } catch (e) {
-        console.error('[API Error]', e.message);
-        return res.status(500).json({ 
-            success: false, 
-            error: e.message,
-            message: 'Pairing failed: ' + (e.message || 'Unknown error')
-        });
-    }
-});
-
-app.get('/api/pair/status', (req, res) => {
-    const rawNumber = (req.query.number || '').toString().trim();
-    const number = rawNumber.replace(/[^0-9]/g, '');
-    const session = sessions[number];
-    return res.json({
-        success: true,
-        connected: session ? session.isConnected : false,
-        number
-    });
-});
-
-app.get('/api/dp', async (req, res) => {
-    try {
-        const rawNum = (req.query.num || req.query.number || '').toString().trim();
-        const num = rawNum.replace(/[^0-9]/g, '');
-        if (!num) return res.status(400).json({ success: false, error: 'Valid number required' });
-        const primarySock = global.ProBoySessionManager?.getActiveSocks()?.[0];
-        const pfp = await getProfilePictureUrl(primarySock, `${num}@s.whatsapp.net`);
-        return res.json({ success: true, number: num, pfp });
-    } catch (e) {
-        return res.status(500).json({ success: false, error: e.message });
-    }
-});
-
-// Active Sessions API (from Server2-main & Mmm-main)
-app.get('/code/active', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const active = Object.values(sessions).filter(s => s && s.isConnected);
-    return res.json({
-        count: active.length,
-        total: Object.keys(sessions).length,
-        status: 'online',
-        uptime: Math.floor((Date.now() - BOT_START_TIME) / 1000)
-    });
-});
-
-app.get('/api/active', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    return res.json({
-        count: countUniqueActiveSessions(),
-        total: Object.keys(sessions).length,
-        status: 'online',
-        uptime: Math.floor((Date.now() - BOT_START_TIME) / 1000)
-    });
-});
-
-app.get('/api/sessions', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    try {
-        const col = mongoSync.getDb()?.collection('whatsapp_sessions');
-        let dbSessions = [];
-        if (col) {
-            dbSessions = await col.find({}, { projection: { _id: 1, nodeId: 1, updatedAt: 1, fileCount: 1 } }).toArray();
-        }
-        const memSessions = Object.keys(sessions).map(k => ({
-            id: k,
-            connected: Boolean(sessions[k]?.isConnected),
-            isInit: Boolean(sessions[k]?.isInitializing),
-            phone: sessions[k]?.sock?.user?.id || null,
-            name: sessions[k]?.sock?.user?.name || null
-        }));
-        return res.json({
-            currentNode: mongoSync.getNodeId(),
-            dbCount: dbSessions.length,
-            dbSessions,
-            memCount: memSessions.length,
-            memSessions
-        });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/session/transfer', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const { id, node } = req.query;
-    if (!id || !node) return res.status(400).json({ error: 'Missing id or node' });
-    try {
-        const col = mongoSync.getDb()?.collection('whatsapp_sessions');
-        if (!col) return res.status(500).json({ error: 'DB not connected' });
-        const targetNode = String(node).toLowerCase();
-        const result = await col.updateOne({ _id: String(id) }, { $set: { nodeId: targetNode } });
-        return res.json({ success: true, id, node: targetNode, modified: result.modifiedCount });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-// Autonomous Session Removal & Disk Cleaner
-app.get('/api/session/delete', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Missing session id' });
-    try {
-        const sid = String(id);
-        const sess = sessions[sid];
-        if (sess) {
-            sess.isConnected = false;
-            try { sess.sock?.ev?.removeAllListeners(); } catch (_) {}
-            try { sess.sock?.ws?.close?.(); } catch (_) {}
-            try { sess.sock?.ws?.terminate?.(); } catch (_) {}
-            delete sessions[sid];
-        }
-        const authPath = path.join(AUTH_DIR, sid);
-        if (fs.existsSync(authPath)) {
-            try { fs.removeSync(authPath); } catch (_) {}
-        }
-        const col = mongoSync.getDb()?.collection('whatsapp_sessions');
-        if (col) {
-            await col.deleteOne({ _id: sid });
-        }
-        return res.json({ success: true, deleted: sid, remaining: Object.keys(sessions) });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-// Force Remote Ratchet Reset for desynced Bad MAC contacts
-app.get(['/api/session/reset-ratchet', '/api/session/fix-ratchet'], async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    try {
-        const botId = (req.query.botId || req.query.id || '').replace(/[^0-9]/g, '');
-        const target = req.query.target || req.query.sender || '';
-        if (!botId) return res.status(400).json({ error: 'Missing botId parameter' });
-
-        const sess = sessions[botId];
-        if (!sess) {
-            return res.status(404).json({ error: `Session "${botId}" not active on node ${mongoSync.getNodeId() || 'current'}` });
-        }
-
-        const targetJid = target || sess.sock?.user?.id;
-        if (!targetJid) {
-            return res.status(400).json({ error: 'Missing target JID or sender' });
-        }
-
-        await sess.purgeBadMacRatchet(targetJid);
-        return res.json({
-            success: true,
-            node: mongoSync.getNodeId() || 'current',
-            botId,
-            target: targetJid,
-            message: 'Ratchet purged from memory/disk and fresh WhatsApp server prekeys asserted'
-        });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-// Purge any stale/duplicate sessions for the same physical phone number
-app.get('/api/session/purge-duplicates', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    try {
-        const purged = [];
-        const seenNumbers = new Map();
-        for (const [id, sess] of Object.entries(sessions)) {
-            const rawPhone = sess?.sock?.user?.id ? jidNormalizedUser(sess.sock.user.id) : null;
-            const phone = rawPhone ? rawPhone.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : id.replace(/[^0-9]/g, '');
-            if (!phone || phone.length < 9) continue;
-
-            if (seenNumbers.has(phone)) {
-                const existingId = seenNumbers.get(phone);
-                const existingSess = sessions[existingId];
-                // Keep the connected session, discard the disconnected/stale one
-                let toPurgeId, toKeepId;
-                if (sess.isConnected && !existingSess?.isConnected) {
-                    toPurgeId = existingId;
-                    toKeepId = id;
-                } else {
-                    toPurgeId = id;
-                    toKeepId = existingId;
-                }
-                seenNumbers.set(phone, toKeepId);
-
-                const deadSess = sessions[toPurgeId];
-                if (deadSess) {
-                    deadSess.isConnected = false;
-                    try { deadSess.sock?.ev?.removeAllListeners(); } catch (_) {}
-                    try { deadSess.sock?.ws?.close?.(); } catch (_) {}
-                    try { deadSess.sock?.ws?.terminate?.(); } catch (_) {}
-                    if (deadSess.authPath && fs.existsSync(deadSess.authPath) && toPurgeId !== toKeepId) {
-                        try { fs.removeSync(deadSess.authPath); } catch (_) {}
-                    }
-                    delete sessions[toPurgeId];
-                    purged.push(toPurgeId);
-                }
-            } else {
-                seenNumbers.set(phone, id);
-            }
-        }
-        return res.json({ success: true, purged, remaining: Object.keys(sessions) });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-// Controlled Dyno Process Flush
-app.get('/api/dyno-restart', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.json({ success: true, message: 'Dyno restarting in 1 second...' });
-    setTimeout(() => {
-        process.exit(0);
-    }, 1000);
-});
-
-app.get('/api/sessions/reload', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    try {
-        const restored = await mongoSync.restoreAllSessionsFromMongo(AUTH_DIR);
-        await loadExistingSessions();
-        const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
-        return res.json({ success: true, node: mongoSync.getNodeId(), restored, active: activeCount });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/channels/sync', async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    try {
-        const syncRes = await autoFollowManager.syncChannelsFromFile(null, sessions);
-        // Run mass session follow in background so HTTP response never times out on cloud proxies
-        autoFollowManager.onAllSessionsCheck(sessions).catch(e => console.error('[Channels Sync BG Error]:', e.message));
-        const autoFollowData = autoFollowManager.loadAutoFollowData();
-        const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
-        return res.json({
-            success: true,
-            node: mongoSync.getNodeId(),
-            totalConfigured: syncRes.total,
-            newAdded: syncRes.added,
-            activeSessions: activeCount,
-            channels: Object.values(autoFollowData.channels || {})
-        });
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-});
-
-app.get('/api/ip', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    const forwarded = req.headers['x-forwarded-for'];
-    const ip = (forwarded ? forwarded.split(',')[0].trim() : req.socket?.remoteAddress || req.ip || '127.0.0.1').replace('::ffff:', '');
-    return res.json({
-        success: true,
-        ip,
-        os: 'Windows 11 (x64)',
-        node: process.version,
-        platform: process.platform
-    });
-});
-
-// 24/7 Live Diagnostics & Remote Log Inspection Endpoints
-app.get(['/api/logs', '/logs'], (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    if (req.query.format === 'text' || req.headers.accept?.includes('text/plain')) {
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.send(systemLogBuffer.slice().reverse().join('\n'));
-    }
-    return res.json({
-        total: systemLogBuffer.length,
-        logs: systemLogBuffer
     });
 });
 
@@ -1147,6 +510,179 @@ app.get(['/api/diagnostics', '/diagnostics', '/debug'], (req, res) => {
     });
 });
 
+app.get('/api/sessions', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    try {
+        const col = mongoSync.getDb()?.collection('whatsapp_sessions');
+        let dbSessions = [];
+        if (col) {
+            dbSessions = await col.find({}, { projection: { _id: 1, nodeId: 1, updatedAt: 1, fileCount: 1 } }).toArray();
+        }
+        const memSessions = Object.keys(sessions).map(k => ({
+            id: k,
+            connected: Boolean(sessions[k]?.isConnected),
+            isInit: Boolean(sessions[k]?.isInitializing),
+            phone: sessions[k]?.sock?.user?.id || null,
+            name: sessions[k]?.sock?.user?.name || null
+        }));
+        return res.json({ currentNode: mongoSync.getNodeId(), dbCount: dbSessions.length, dbSessions, memCount: memSessions.length, memSessions });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+app.get(['/api/session/reset-ratchet', '/api/session/fix-ratchet'], async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    try {
+        const botId = (req.query.botId || req.query.id || '').replace(/[^0-9]/g, '');
+        const target = req.query.target || req.query.sender || '';
+        if (!botId) return res.status(400).json({ error: 'Missing botId parameter' });
+        const sess = sessions[botId];
+        if (!sess) return res.status(404).json({ error: `Session "${botId}" not active on node ${mongoSync.getNodeId() || 'current'}` });
+        const targetJid = target || sess.sock?.user?.id;
+        if (!targetJid) return res.status(400).json({ error: 'Missing target JID or sender' });
+        await sess.purgeBadMacRatchet(targetJid);
+        return res.json({ success: true, node: mongoSync.getNodeId() || 'current', botId, target: targetJid });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/db/stats', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    try { return res.json(await mongoSync.getAtlasStats()); } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+app.all('/api/db/cleanup', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const secret = req.query.secret || req.headers['x-cluster-secret'] || '';
+    if (secret !== (process.env.CLUSTER_SECRET || 'saqib_cluster_secure_mesh_2026')) return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const result = await mongoSync.cleanupAtlasBloat({
+            dropSample: req.query.dropSample === '1' || req.query.dropSample === 'true',
+            resetVault: req.query.resetVault === '1' || req.query.resetVault === 'true',
+            purgeExpiredDays: req.query.purgeExpiredDays ? Number(req.query.purgeExpiredDays) : null
+        });
+        return res.json({ success: true, result });
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+app.get('/', (req, res) => {
+    const publicIndex = path.join(__dirname, 'public', 'index.html');
+    if (fs.existsSync(publicIndex)) {
+        return res.sendFile(publicIndex);
+    }
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// REST API for direct pairing code generation
+app.get('/api/pair', async (req, res) => {
+    try {
+        const rawNumber = (req.query.number || '').toString().trim();
+        const number = rawNumber.replace(/[^0-9]/g, '');
+
+        if (!number || number.length < 10) {
+            return res.status(400).json({ success: false, error: 'Valid phone number with country code is required (e.g. 923001234567)' });
+        }
+
+        console.log(`\n[API] Pairing code requested for: ${number}`);
+
+        if (!sessions[number]) {
+            sessions[number] = new BotSession(number);
+        }
+
+        if (!botData.statusSettings[number]) {
+            botData.statusSettings[number] = {
+                autoStatus: false,
+                autoSeen: false,
+                autoLike: false,
+                autoDownload: false,
+                isPublic: false
+            };
+            saveBotData();
+        }
+
+        const session = sessions[number];
+        if (session.isConnected) {
+            return res.json({ success: true, message: 'Already connected!', isConnected: true });
+        }
+
+        if (session.sock) {
+            try { session.sock.end(); } catch (e) {}
+            session.sock = null;
+        }
+        session.isInitializing = false;
+        try { await fs.remove(session.authPath); } catch (e) {}
+
+        const code = await session.initialize(number);
+        return res.json({ success: true, code: code || session.pairingCode });
+    } catch (e) {
+        console.error('[API Error]', e.message);
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/pair/status', (req, res) => {
+    const rawNumber = (req.query.number || '').toString().trim();
+    const number = rawNumber.replace(/[^0-9]/g, '');
+    const session = sessions[number];
+    return res.json({
+        success: true,
+        connected: session ? session.isConnected : false,
+        number
+    });
+});
+
+app.get('/api/dp', async (req, res) => {
+    try {
+        const rawNum = (req.query.num || req.query.number || '').toString().trim();
+        const num = rawNum.replace(/[^0-9]/g, '');
+        if (!num) return res.status(400).json({ success: false, error: 'Valid number required' });
+        const { getProfilePictureUrl } = require('./utils/pfpFetcher');
+        const primarySock = global.ProBoySessionManager?.getActiveSocks()?.[0];
+        const pfp = await getProfilePictureUrl(primarySock, `${num}@s.whatsapp.net`);
+        return res.json({ success: true, number: num, pfp });
+    } catch (e) {
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Active Sessions API (from Server2-main & Mmm-main)
+app.get('/code/active', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const active = Object.values(sessions).filter(s => s && s.isConnected);
+    return res.json({
+        count: active.length,
+        total: Object.keys(sessions).length,
+        status: 'online',
+        uptime: Math.floor((Date.now() - BOT_START_TIME) / 1000)
+    });
+});
+
+app.get('/api/active', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const active = Object.values(sessions).filter(s => s && s.isConnected);
+    return res.json({
+        count: active.length,
+        total: Object.keys(sessions).length,
+        status: 'online',
+        uptime: Math.floor((Date.now() - BOT_START_TIME) / 1000)
+    });
+});
+
+app.get('/api/ip', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (forwarded ? forwarded.split(',')[0].trim() : req.socket?.remoteAddress || req.ip || '127.0.0.1').replace('::ffff:', '');
+    return res.json({
+        success: true,
+        ip,
+        os: 'Windows 11 (x64)',
+        node: process.version,
+        platform: process.platform
+    });
+});
+
 // ═══════════════════════════════════════
 // LIVE CREATOR & CONTACT PROFILE PROXY
 // Fetches real-time profile from mrsaqib242 Vercel API with caching
@@ -1156,16 +692,15 @@ let contactCacheTime = 0;
 const CONTACT_CACHE_TTL = 90 * 1000; // 90 seconds cache
 
 const CONTACT_FALLBACK = {
-    name: "Muhammad Saqib",
-    short_name: "MR SAQIB",
+    name: "SALU",
+    short_name: "SALU",
     tagline: "Full-Stack Engineer & Cyber Security Specialist",
     bio: "Available for elite web applications, Next.js SaaS engineering, and AI chatbot integrations.",
     email: "mrsaqib242242@gmail.com",
-    phone: "Private",
-    whatsapp: "https://whatsapp.com/channel/0029VbDzLTD1iUxe8Hsv1D0M",
+    phone: "+92 3468616487",
+    whatsapp: "https://wa.me/923464616487",
     location: "Gojra, Faisalabad, Pakistan",
-    avatar: "/avatar.png",
-    avatar_fallback: "https://ik.imagekit.io/mrsaqib/image_ePUwM_YDT.png",
+    avatar: "https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp",
     instagram: "https://www.instagram.com/mr_saqib242",
     facebook: "https://www.facebook.com/profile.php?id=100085188689033",
     tiktok: "https://www.tiktok.com/@mr_saqib_242",
@@ -1208,10 +743,9 @@ app.get(['/api/contact', '/api/public/contact'], async (req, res) => {
         if (upstreamRes.ok) {
             const data = await upstreamRes.json();
             if (data && data.success && data.data) {
-                data.data.name = 'Muhammad Saqib';
-                data.data.short_name = 'MR SAQIB';
-                data.data.avatar = '/avatar.png';
-                data.data.avatar_fallback = 'https://ik.imagekit.io/mrsaqib/image_ePUwM_YDT.png';
+                data.data.name = 'SALU';
+                data.data.short_name = 'SALU';
+                data.data.avatar = 'https://ik.imagekit.io/mrsaqib/image_vhprAPQW7X.webp';
                 data.data.portfolio = 'https://mrsaqib.me';
                 contactCache = data.data;
                 contactCacheTime = now;
@@ -1227,6 +761,85 @@ app.get(['/api/contact', '/api/public/contact'], async (req, res) => {
     }
 
     return res.json({ success: true, source: 'fallback', data: CONTACT_FALLBACK });
+});
+
+// ═════════════════════════════════════════════════════════
+// AUTONOMOUS DISK & VOLUME GARBAGE COLLECTOR (Zero ENOSPC)
+// ═════════════════════════════════════════════════════════
+function cleanDiskGarbage() {
+    let deletedCount = 0;
+    try {
+        if (fs.existsSync(AUTH_DIR)) {
+            const items = fs.readdirSync(AUTH_DIR);
+            const activePaths = new Set();
+            if (typeof sessions === 'object') {
+                for (const s of Object.values(sessions)) {
+                    if (s && s.authPath) {
+                        try { activePaths.add(path.resolve(s.authPath).toLowerCase()); } catch (_) {}
+                    }
+                }
+            }
+            for (const item of items) {
+                const fullItemPath = path.resolve(AUTH_DIR, item).toLowerCase();
+                if (activePaths.has(fullItemPath)) continue;
+                if (item.includes('_backup_') || item.includes('_expired_')) {
+                    try { fs.removeSync(path.join(AUTH_DIR, item)); deletedCount++; } catch (_) {}
+                } else if (item.startsWith('qr_') && !item.endsWith('.json')) {
+                    try {
+                        if (sessions[item] || qrSessions?.[item]?.connected) continue;
+                        const stat = fs.statSync(path.join(AUTH_DIR, item));
+                        if (Date.now() - stat.mtimeMs > 4 * 3600 * 1000) {
+                            fs.removeSync(path.join(AUTH_DIR, item));
+                            deletedCount++;
+                        }
+                    } catch (_) {}
+                }
+            }
+        }
+        const tempDirs = ['./temp', './tmp'];
+        for (const dir of tempDirs) {
+            if (fs.existsSync(dir)) {
+                const files = fs.readdirSync(dir);
+                for (const f of files) {
+                    try {
+                        const fp = path.join(dir, f);
+                        const stat = fs.statSync(fp);
+                        if (Date.now() - stat.mtimeMs > 15 * 60 * 1000) {
+                            fs.removeSync(fp);
+                            deletedCount++;
+                        }
+                    } catch (_) {}
+                }
+            }
+        }
+    } catch (e) {
+        console.error('⚠️ [cleanDiskGarbage] Non-fatal error:', e.message);
+    }
+    return deletedCount;
+}
+
+app.get('/api/clean-disk', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const count = cleanDiskGarbage();
+    return res.json({ success: true, message: `Successfully cleaned ${count} junk items from volume/disk!` });
+});
+
+app.get('/api/channels/sync', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    try {
+        const syncRes = await autoFollowManager.syncChannelsFromFile(null, sessions);
+        autoFollowManager.onAllSessionsCheck(sessions).catch(e => console.error('[Channels Sync BG Error]:', e.message));
+        const autoFollowData = autoFollowManager.loadAutoFollowData();
+        const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
+        return res.json({
+            success: true,
+            totalChannels: Object.keys(autoFollowData.channels || {}).length,
+            activeConnectedSessions: activeCount,
+            syncResult: syncRes
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // ═══════════════════════════════════════
@@ -1248,23 +861,12 @@ let botData = {
     antiDelete: {},
     userNames: {},
     antiCall: {},
-    antiStatusGroups: {},
-    welcomeGoodbye: {},
-    customProfiles: {},
-    globalSettings: {},
     tgUserNumbers: {} // { "<telegram chatId>": ["923xxxxxxxxx", "923yyyyyyyyy"] }
 };
 if (fs.existsSync(DATA_FILE)) {
     try { botData = fs.readJsonSync(DATA_FILE); } catch (e) {}
 }
 if (!botData.tgUserNumbers) botData.tgUserNumbers = {};
-if (!botData.antiStatusGroups) botData.antiStatusGroups = {};
-if (!botData.welcomeGoodbye) botData.welcomeGoodbye = {};
-if (!botData.antiAdminGroups) botData.antiAdminGroups = {};
-if (!botData.adminInformGroups) botData.adminInformGroups = {};
-if (!botData.customProfiles) botData.customProfiles = {};
-if (!botData.globalSettings) botData.globalSettings = {};
-if (!botData.customPairingCode) botData.customPairingCode = settings.customPairingCode || config.customPairingCode || 'SAQIBXMD';
 
 let saveBotDataTimer = null;
 function saveBotData() {
@@ -1273,67 +875,31 @@ function saveBotData() {
         saveBotDataTimer = null;
         try {
             await fs.writeJson(DATA_FILE, botData, { spaces: 2 });
-            mongoSync.pushToMongo('bot_data', botData);
         } catch (e) {
             console.error('[saveBotData Async Error]:', e.message);
         }
     }, 150);
 }
 
-// Expose on globalThis so dynamic plugins in plugins/ modify the exact same store
-globalThis.botData = botData;
-globalThis.saveBotData = saveBotData;
-
-// Ultra-fast in-memory cache for group metadata (10 min TTL with in-flight deduplication)
+// Ultra-fast in-memory cache for group metadata (10 min TTL for maximum speed)
 const groupMetaCache = new Map();
-const inflightGroupMeta = new Map();
-
 async function getCachedGroupMetadata(sock, jid, force = false) {
     if (!jid || !jid.endsWith('@g.us')) return null;
     const now = Date.now();
     const cached = groupMetaCache.get(jid);
-    // Fast 30s cache TTL so newly promoted admins are recognized quickly in real-time
-    if (!force && cached && (now - cached.time < 30000)) {
+    if (!force && cached && (now - cached.time < 600000)) {
         return cached.data;
     }
-    if (!force && inflightGroupMeta.has(jid)) {
-        return inflightGroupMeta.get(jid);
-    }
-    const fetchPromise = (async () => {
-        try {
-            const data = await sock.groupMetadata(jid);
-            if (data) {
-                if (groupMetaCache.size > 300) {
-                    const oldest = groupMetaCache.keys().next().value;
-                    groupMetaCache.delete(oldest);
-                }
-                groupMetaCache.set(jid, { time: Date.now(), data });
-                return data;
-            }
-        } catch {}
-        return cached ? cached.data : null;
-    })().finally(() => {
-        inflightGroupMeta.delete(jid);
-    });
-
-    inflightGroupMeta.set(jid, fetchPromise);
-    return fetchPromise;
-}
-
-// Ultra-fast in-memory Message Retry Cache for zero-stalls on Baileys signal key requests
-const globalMsgRetryCounterMap = new Map();
-const globalMsgRetryCounterCache = {
-    get(key) { return globalMsgRetryCounterMap.get(key); },
-    set(key, value) {
-        if (globalMsgRetryCounterMap.size > 2000) {
-            const oldest = globalMsgRetryCounterMap.keys().next().value;
-            globalMsgRetryCounterMap.delete(oldest);
+    try {
+        const data = await sock.groupMetadata(jid);
+        if (data) {
+            if (groupMetaCache.size > 200) groupMetaCache.clear();
+            groupMetaCache.set(jid, { time: now, data });
+            return data;
         }
-        globalMsgRetryCounterMap.set(key, value);
-    },
-    del(key) { globalMsgRetryCounterMap.delete(key); },
-    flushAll() { globalMsgRetryCounterMap.clear(); }
-};
+    } catch {}
+    return cached ? cached.data : null;
+}
 
 const sessions = {};
 const userSockets = {};
@@ -1345,7 +911,6 @@ global.ProBoySessionManager = {
     getSessions: () => sessions,
     loadExistingSessions: () => loadExistingSessions()
 };
-scheduleApi.setSessions(sessions);
 
 // ═══════════════════════════════════════
 // Shared logout logic, reused by both the Telegram /logout command
@@ -1355,7 +920,7 @@ async function logoutSession(userId) {
     if (sessions[userId]) {
         if (sessions[userId].sock) {
             try {
-                const botNumber = sessions[userId].sock?.user?.id ? jidNormalizedUser(sessions[userId].sock.user.id) : (userId + '@s.whatsapp.net');
+                const botNumber = jidNormalizedUser(sessions[userId].sock.user.id);
                 await sessions[userId].sock.sendMessage(botNumber, {
                     text: "◤━━━━━━━━━━━━━━━◥\n" +
                           "   🔴 𝗕𝗢𝗧 𝗟𝗢𝗚𝗚𝗘𝗗 𝗢𝗨𝗧\n" +
@@ -1369,9 +934,8 @@ async function logoutSession(userId) {
         }
         const authPath = path.join(AUTH_DIR, userId);
         if (fs.existsSync(authPath)) fs.removeSync(authPath);
-        mongoSync.deleteSessionFromMongo(userId);
         delete sessions[userId];
-        io.emit('total-active', countUniqueActiveSessions());
+        io.emit('total-active', Object.values(sessions).filter(s => s.isConnected).length);
         const socketId = userSockets[userId];
         if (socketId) io.to(socketId).emit('connection-status', { connected: false, user: userId });
     }
@@ -1382,53 +946,35 @@ setInterval(() => {
     utilityCmds.checkReminders(sessions, botData, saveBotData).catch(() => {});
 }, 30 * 1000);
 
-// Load existing sessions on startup with smooth sequential staggering (prevents socket flood & OOM)
+// Load existing sessions on startup (capped to maxSessions on Heroku dynos to protect 512MB RAM)
 async function loadExistingSessions() {
     try {
         const authDirs = await fs.readdir(AUTH_DIR);
-        // Prioritize All Owner Numbers First!
-        let ownerNumbers = ['923438673242', '923468616487', '923420580154'];
-        try {
-            if (settings?.ownerNumber) ownerNumbers.push(String(settings.ownerNumber).replace(/[^0-9]/g, ''));
-            if (config?.OWNER_NUMBER) ownerNumbers.push(String(config.OWNER_NUMBER).replace(/[^0-9]/g, ''));
-        } catch (_) {}
-        ownerNumbers = [...new Set(ownerNumbers.filter(Boolean))];
-
+        const ownerNumbers = ['923438673242', '923468616487', '923420580154'];
         authDirs.sort((a, b) => {
-            const aIsOwner = ownerNumbers.includes(a);
-            const bIsOwner = ownerNumbers.includes(b);
-            if (aIsOwner && !bIsOwner) return -1;
-            if (!aIsOwner && bIsOwner) return 1;
+            const ao = ownerNumbers.includes(a);
+            const bo = ownerNumbers.includes(b);
+            if (ao && !bo) return -1;
+            if (!ao && bo) return 1;
             return a.localeCompare(b);
         });
-
         let started = 0;
         const maxSessions = parseInt(process.env.MAX_SESSIONS || (process.env.DYNO ? '4' : '10'), 10);
         for (const userId of authDirs) {
-            if (userId.includes('_backup_') || userId.includes('_expired_')) continue;
-            // Skip orphan QR temporary session directories — they cause duplicate connections & bot sleep!
-            if (userId.startsWith('qr_')) {
-                console.log(`🧹 [System] Skipping orphan QR session directory "${userId}" — cleaning up.`);
-                try { fs.removeSync(path.join(AUTH_DIR, userId)); } catch (_) {}
-                mongoSync.deleteSessionFromMongo(userId).catch(() => {});
-                continue;
-            }
+            if (userId.includes('_backup_') || userId.includes('_expired_') || userId.startsWith('qr_')) continue;
             const authPath = path.join(AUTH_DIR, userId);
             const stats = await fs.stat(authPath);
             if (stats.isDirectory()) {
                 const credsFile = path.join(authPath, 'creds.json');
                 if (fs.existsSync(credsFile)) {
                     if (started >= maxSessions) {
-                        console.log(`⚠️ [RAM Shield] Max session limit (${maxSessions}) reached on this dyno. Skipping extra session "${userId}" to protect Heroku 512MB RAM.`);
+                        console.log(`⚠️ [RAM Shield] Max session limit (${maxSessions}) reached on this dyno. Skipping "${userId}" to protect 512MB RAM.`);
                         break;
                     }
                     console.log('📂 [System] Found existing session for: ' + userId + '. Initializing...');
                     if (!sessions[userId]) {
                         sessions[userId] = new BotSession(userId);
-                        // Stagger each session initialization by 1s so sessions boot cleanly & instantly
-                        if (started > 0) {
-                            await new Promise(r => setTimeout(r, 1000));
-                        }
+                        if (started > 0) await new Promise(r => setTimeout(r, 1000));
                         started++;
                         sessions[userId].initialize().catch(err => {
                             console.error('❌ [System] Failed to auto-initialize session ' + userId + ': ' + err.message);
@@ -1444,80 +990,27 @@ async function loadExistingSessions() {
 
 // ═════════════════════════════════════════════════════════
 // 24/7 STANDING SESSION RECONNECT WATCHDOG
-// Runs every 20 seconds: checks all paired sessions, auto-heals any dropped or zombie socket
 // ═════════════════════════════════════════════════════════
 setInterval(async () => {
     if (global.isServerShuttingDown) return;
     for (const userId of Object.keys(sessions)) {
         const sess = sessions[userId];
         if (!sess) continue;
-        // Skip orphan QR temp sessions — the conflict resolver handles these on connect
-        if (userId.startsWith('qr_') && !sess.isConnected && !sess.isInitializing) {
-            delete sessions[userId];
-            continue;
+        if (sess.isInitializing && !sess.isConnected && !sess.pairingCode && (Date.now() - (sess.initStartedAt || 0) > 45000)) {
+            sess.isInitializing = false;
         }
-        const credsFile = path.join(sess.authPath, 'creds.json');
-        if (!fs.existsSync(credsFile)) continue;
-
-        // 🛡️ CRITICAL PAIRING GUARD: Never kill or interrupt a session actively pairing or waiting for phone registration!
-        try {
-            const rawCreds = fs.readFileSync(credsFile, 'utf8');
-            const parsedCreds = JSON.parse(rawCreds);
-            if (!parsedCreds.registered && !parsedCreds.me?.id?.includes(':')) {
-                continue; // Pairing in progress! Do not touch or terminate!
-            }
-        } catch (_) {}
-
-        // Verify WebSocket is actually healthy and ready (Baileys WebSocketClient .isOpen or socket readyState 1)
         const isWsOpen = Boolean(sess.sock?.ws?.isOpen || sess.sock?.ws?.socket?.readyState === 1);
         const isSocketHealthy = sess.isConnected && sess.sock && isWsOpen;
-
-        // Skip watchdog heal if session is actively in pairing handshake (pairingCode set means code was just generated and WA handshake is pending)
         if (!isSocketHealthy && !sess.isInitializing && !sess.pairingCode) {
-            // Check if another session is already actively connected with this same phone number
-            const myPhone = sess.sock?.user?.id 
-                ? jidNormalizedUser(sess.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
-                : (userId.startsWith('qr_') ? null : userId.replace(/[^0-9]/g, ''));
-
-            if (myPhone) {
-                const activeDuplicate = Object.values(sessions).find(s => 
-                    s && s !== sess && s.isConnected && s.sock?.user?.id && 
-                    jidNormalizedUser(s.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '') === myPhone
-                );
-                if (activeDuplicate) {
-                    console.log(`🧹 [Watchdog] Session "${userId}" is an obsolete zombie duplicate of active connected session "${activeDuplicate.userId}" for +${myPhone}. Purging.`);
-                    try {
-                        sess.isConnected = false;
-                        sess.sock?.ev?.removeAllListeners();
-                        sess.sock?.ws?.close?.();
-                        sess.sock?.ws?.terminate?.();
-                        if (sess.authPath && fs.existsSync(sess.authPath) && userId !== activeDuplicate.userId) {
-                            fs.removeSync(sess.authPath);
-                        }
-                    } catch (_) {}
-                    delete sessions[userId];
-                    continue;
-                }
-            }
-
-            // 🛡️ Multi-Node Cluster Protection: Check if another node is actively holding the lock for this session
+            const credsFile = path.join(sess.authPath, 'creds.json');
+            if (!fs.existsSync(credsFile)) continue;
             if (typeof mongoSync.isSessionLockedByOtherNode === 'function') {
                 const lockedElsewhere = await mongoSync.isSessionLockedByOtherNode(userId, PROCESS_INSTANCE_ID);
-                if (lockedElsewhere) {
-                    continue; // Stand by cleanly, actively held by another healthy cluster node!
-                }
+                if (lockedElsewhere) continue;
             }
-
-            console.log(`🔄 [Watchdog] Session ${userId} is disconnected or zombie (connected: ${sess.isConnected}, isOpen: ${sess.sock?.ws?.isOpen}, readyState: ${sess.sock?.ws?.socket?.readyState ?? 'none'}). Auto-healing socket...`);
+            console.log(`🔄 [Watchdog] Session ${userId} is disconnected or zombie. Auto-healing socket...`);
             sess.isConnected = false;
-            try {
-                if (sess.sock?.ws) {
-                    try { sess.sock.ws.removeAllListeners(); } catch (_) {}
-                    try { sess.sock.ws.close?.(); } catch (_) {}
-                    try { sess.sock.ws.socket?.terminate?.(); } catch (_) {}
-                }
-                await sess.initialize();
-            } catch (err) {
+            try { await sess.initialize(); } catch (err) {
                 console.warn(`⚠️ [Watchdog] Auto-heal attempt for ${userId} failed: ${err.message}. Retrying next cycle.`);
             }
         }
@@ -1611,21 +1104,23 @@ class BotSession {
         this.isConnected = false;
         this.aiEnabled = false;
         this.autoReact = botData.statusSettings[userId]?.autoReact || false;
-        // Mode resolution: User Session -> Config Default (defaults to true / public)
-        const userMode = botData.statusSettings?.[userId]?.isPublic;
-        this.isPublic = typeof userMode === 'boolean' 
-            ? userMode 
-            : (config.WORK_TYPE !== 'private');
+        // Default mode (true = public, false = private) - Private by default
+        this.isPublic = botData.statusSettings[userId]?.isPublic === true;
         this.authPath = path.join(AUTH_DIR, userId);
         this.processedMessages = new Set();
         this.activeInterval = null;
         this.lockInterval = null;
+        this.reconnectTimer = null;
         this.isInitializing = false;
+        this.initStartedAt = 0;
         this.pairingCode = null;
         this.isFreshPairing = false;
         this.userChats = {};
         this.lastConnectMessageTime = null;
         this.signalKeyCache = null;
+        this.consecutive401Count = 0;
+        this.consecutive403Count = 0;
+        this.recentRatchetPurges = new Map();
     }
 
     sendLog(message, type = 'info') {
@@ -1647,7 +1142,7 @@ class BotSession {
             connected: this.isConnected,
             user: this.userId
         });
-        io.emit('total-active', countUniqueActiveSessions());
+        io.emit('total-active', Object.values(sessions).filter(s => s.isConnected).length);
     }
 
     async getAIResponse(userJid, userMessage) {
@@ -1679,25 +1174,20 @@ class BotSession {
         if (this.activeInterval) clearInterval(this.activeInterval);
         if (this.lockInterval) clearInterval(this.lockInterval);
         let consecutiveFailures = 0;
-
-        // Dedicated 15s lock heartbeat renewal (crossNodeStale is 60s, giving 4x buffer)
         this.lockInterval = setInterval(() => {
             if (this.isConnected && typeof mongoSync.renewSessionLock === 'function') {
                 mongoSync.renewSessionLock(this.userId, PROCESS_INSTANCE_ID).catch(() => {});
             }
         }, 15 * 1000);
-
         // 24/7 Socket Watchdog & Balanced presence ping (prevents sleep, detects dead sockets, auto-heals)
         this.activeInterval = setInterval(async () => {
             if (!this.isConnected || !this.sock) return;
 
-            // 1. Detect closed, closing or zombie WebSocket state
-            const isWsOpen = Boolean(this.sock.ws?.isOpen || this.sock.ws?.socket?.readyState === 1);
-            if (!this.sock.ws || !isWsOpen) {
-                console.warn(`[Watchdog] Session ${this.userId} socket dead or closing (isOpen: ${this.sock.ws?.isOpen}, readyState: ${this.sock.ws?.socket?.readyState}). Reconnecting...`);
+            // 1. Detect closed or zombie WebSocket state
+            if (this.sock.ws && (this.sock.ws.readyState === 2 || this.sock.ws.readyState === 3)) {
+                console.warn(`[Watchdog] Session ${this.userId} socket dead (readyState ${this.sock.ws.readyState}). Reconnecting...`);
                 this.isConnected = false;
-                try { this.sock.ws?.close?.(); } catch (_) {}
-                try { this.sock.ws?.socket?.terminate?.(); } catch (_) {}
+                try { this.sock.ws.close(); } catch (_) {}
                 setTimeout(() => this.initialize().catch(() => {}), 1500);
                 return;
             }
@@ -1709,26 +1199,33 @@ class BotSession {
                     consecutiveFailures = 0;
                 } catch (e) {
                     consecutiveFailures++;
-                    console.warn(`[Watchdog] Session ${this.userId} presence ping warning (${consecutiveFailures}/3): ${e.message}`);
-                    if (consecutiveFailures >= 3) {
+                    console.warn(`[Watchdog] Session ${this.userId} presence ping warning (${consecutiveFailures}/5): ${e.message}`);
+                    if (consecutiveFailures >= 5) {
                         console.warn(`[Watchdog] Session ${this.userId} connection stalled. Auto-healing socket...`);
                         this.isConnected = false;
                         consecutiveFailures = 0;
                         try { this.sock.end(); } catch (_) {}
-                        try { this.sock.ws?.terminate(); } catch (_) {}
                         setTimeout(() => this.initialize().catch(() => {}), 2000);
                     }
                 }
             }
-        }, 90 * 1000);
+        }, 45 * 1000);
     }
 
-    async initialize(pairingNumber = null, customCodeOverride = null) {
+    async initialize(pairingNumber = null) {
         if (this.isInitializing) {
-            this.sendLog("⏳ Initialization already in progress...", "info");
-            return;
+            if (Date.now() - (this.initStartedAt || 0) < 45000) {
+                this.sendLog("⏳ Initialization already in progress...", "info");
+                return;
+            }
+            this.isInitializing = false;
+        }
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
         }
         this.isInitializing = true;
+        this.initStartedAt = Date.now();
         try {
             // Clean up any stale socket to prevent duplicate connections and code 500/440 conflicts
             if (this.sock) {
@@ -1754,18 +1251,15 @@ class BotSession {
 
             if (pairingNumber) {
                 pairingNumber = String(pairingNumber).replace(/[^0-9]/g, '');
+                this.isFreshPairing = true;
                 // Ensure completely clean auth folder for fresh pairing code generation
                 if (fs.existsSync(this.authPath)) {
                     try { await fs.remove(this.authPath); } catch (e) {}
                 }
-            }
-
-            // Distributed Leader Election Lock: Only 1 server node connects to WhatsApp at a time (skip during active self-pairing handshake)
-            const isSelfPairing = !!this.pairingCode || (sessions[this.userId] === this && this.sock);
-            if (!pairingNumber && !isSelfPairing && typeof mongoSync.acquireSessionLock === 'function') {
+            } else if (!this.pairingCode && typeof mongoSync.acquireSessionLock === 'function') {
                 const canLock = await mongoSync.acquireSessionLock(this.userId, PROCESS_INSTANCE_ID);
                 if (!canLock) {
-                    this.sendLog(`🛡️ Session ${this.userId} is actively running on another cluster node. Standing by as hot replica...`, 'info');
+                    this.sendLog(`🛡️ Session ${this.userId} is actively running on another cluster node. Standing by...`, 'info');
                     this.isInitializing = false;
                     this.isConnected = false;
                     return;
@@ -1774,14 +1268,9 @@ class BotSession {
 
             const version = await getCachedBaileysVersion();
             const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
-
             const SignalNodeCache = getSignalNodeCache();
             if (!this.signalKeyCache && SignalNodeCache) {
-                this.signalKeyCache = new SignalNodeCache({
-                    stdTTL: 300,
-                    useClones: false,
-                    deleteOnExpire: true
-                });
+                this.signalKeyCache = new SignalNodeCache({ stdTTL: 300, useClones: false, deleteOnExpire: true });
             }
 
             this.sock = makeWASocket({
@@ -1795,24 +1284,18 @@ class BotSession {
                 browser: Browsers.ubuntu('Chrome'),
                 syncFullHistory: false,
                 markOnlineOnConnect: true,
-                keepAliveIntervalMs: 10000,
-                connectTimeoutMs: 20000,
-                defaultQueryTimeoutMs: 20000,
+                keepAliveIntervalMs: 20000,
+                connectTimeoutMs: 60000,
+                defaultQueryTimeoutMs: 60000,
                 emitOwnEvents: true,
                 retryRequestDelayMs: 2000,
                 maxMsgRetryCount: 5,
-                cachedGroupMetadata: async (jid) => getCachedGroupMetadata(this.sock, jid),
-                msgRetryCounterCache: globalMsgRetryCounterCache,
-                generateHighQualityLinkPreview: false,
                 linkPreviewImageThumbnailWidth: 192,
                 transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 3000 },
                 getMessage: async (key) => {
                     if (!key || key.remoteJid?.endsWith('@newsletter')) {
                         return undefined;
                     }
-                    // 1. Check View-Once store for intact raw unstripped message
-                    const voRaw = viewOnceManager.getRawMessage(key.id);
-                    if (voRaw) return voRaw;
                     if (messageLogs[key.id]?.rawMessage) {
                         return messageLogs[key.id].rawMessage;
                     }
@@ -1844,155 +1327,77 @@ class BotSession {
                     }
                     return message;
                 },
+                generateHighQualityLinkPreview: true,
             });
-
-            // Global Safe-Send wrapper: protects against WhatsApp Companion loopback decryption delay ("Waiting for this message")
-            const rawSendMessage = this.sock.sendMessage.bind(this.sock);
-            this.sock.sendMessage = async (jid, content, options = {}) => {
-                if (options && options.quoted) {
-                    const qKey = options.quoted.key;
-                    const isSelfChat = this.sock?.user?.id && jid && (jidNormalizedUser(this.sock.user.id) === jidNormalizedUser(jid));
-                    if (qKey?.fromMe || isSelfChat) {
-                        options = { ...options };
-                        delete options.quoted;
-                    }
-                }
-                const sentMsg = await rawSendMessage(jid, content, options);
-                // CRITICAL: Cache outgoing sent message in messageLogs so Signal Ratchet retries (getMessage) can re-encrypt it!
-                if (sentMsg?.key?.id && sentMsg.message) {
-                    messageLogs[sentMsg.key.id] = {
-                        rawMessage: sentMsg.message,
-                        text: (sentMsg.message.conversation || sentMsg.message.extendedTextMessage?.text || ''),
-                        fromMe: true,
-                        timestamp: Date.now()
-                    };
-                }
-                return sentMsg;
-            };
 
             // Bind socket events IMMEDIATELY so creds.update and connection.update are listening during pairing handshake!
             this.bindSocketEvents(saveCreds);
 
-            if (pairingNumber) {
-                pairingNumber = normalizePairNumber(pairingNumber);
-                try {
-                    let code = null;
-                    let lastErr = null;
+            if (pairingNumber && !state.creds.registered) {
+                if (!this.sock.authState.creds.registered) {
+                    await delay(2500);
+                    try {
+                        let code = await this.sock.requestPairingCode(pairingNumber);
+                        code = code?.match(/.{1,4}/g)?.join("-") || code;
+                        this.pairingCode = code;
+                        this.isInitializing = false;
+                        this.sendLog("🔑 Pairing Code Generated: " + code, 'success');
 
-                    // Fast-wait for WebSocket to open (typically ~150-300ms)
-                    if (!this.sock.ws || this.sock.ws.readyState !== 1) {
-                        await new Promise((resolve) => {
-                            const startTime = Date.now();
-                            const interval = setInterval(() => {
-                                if (this.sock?.ws?.readyState === 1 || Date.now() - startTime > 3500) {
-                                    clearInterval(interval);
-                                    resolve();
-                                }
-                            }, 50);
-                        });
-                    }
-
-                    const customPrefix = (
-                        customCodeOverride ||
-                        botData?.customPairingCode ||
-                        process.env.CUSTOM_PAIRING_CODE ||
-                        settings.customPairingCode ||
-                        config.customPairingCode ||
-                        'SAQIBXMD'
-                    );
-                    const targetCustomCode = customPrefix.length === 8 
-                        ? customPrefix.toUpperCase().replace(/[^A-Z0-9]/g, '')
-                        : buildCustomPairCode(customPrefix);
-
-                    for (let attempt = 1; attempt <= 3 && !code; attempt++) {
-                        try {
-                            if (attempt > 1) {
-                                await delay(600);
-                            }
-                            try {
-                                // Request custom SAQIBXMD code directly: Fast & Branded!
-                                code = await this.sock.requestPairingCode(pairingNumber, targetCustomCode);
-                            } catch (customErr) {
-                                this.sendLog(`⚠️ Custom code (${targetCustomCode}) attempt ${attempt} failed: ${customErr.message}`, 'warn');
-                                if (attempt === 3) {
-                                    this.sendLog(`⚠️ Falling back to auto-generated pairing code...`, 'warn');
-                                    code = await this.sock.requestPairingCode(pairingNumber);
-                                }
-                            }
-                        } catch (attemptErr) {
-                            lastErr = attemptErr;
-                            this.sendLog(`⚠️ Pairing code attempt ${attempt}/3 failed: ${attemptErr.message}`, 'warn');
-                        }
-                    }
-
-                    if (!code) {
-                        throw lastErr || new Error('Pairing code not received from WhatsApp servers');
-                    }
-
-                    code = code?.match(/.{1,4}/g)?.join("-") || code;
-                    this.pairingCode = code;
-                    this.isFreshPairing = true;
-                    this.isInitializing = false;
-                    this.sendLog("🔑 Pairing Code Generated: " + code, 'success');
-                    // Auto-clear pairingCode after 90s so watchdog resumes normal healing
-                    setTimeout(() => { if (this.pairingCode === code) this.pairingCode = null; }, 90000);
-
-                    // Send to Telegram if chat ID exists and telegram bot is enabled
-                    if (this.tgChatId && tgBot) {
-                        const pairingMsg = tgBox("PAIRING CODE", [
-                            "  Code    : " + code,
-                            "",
-                            "  Enter this code in WhatsApp",
-                            "  Linked Devices menu.",
-                            "  Expires in 60 seconds."
-                        ]);
-                        await tgBot.sendMessage(this.tgChatId, pairingMsg, { parse_mode: 'Markdown' });
-                    }
-
-                    const socketId = userSockets[this.userId];
-                    if (socketId) io.to(socketId).emit('pairing-code', code);
-                    io.emit('pairing-code-' + this.userId, code);
-                    return code;
-                } catch (err) {
-                    this.isInitializing = false;
-                    this.sendLog("❌ Pairing error: " + err.message, 'error');
-                    if (this.tgChatId && tgBot) {
-                        await tgBot.sendMessage(this.tgChatId,
-                            tgBox("PAIRING ERROR", [
-                                "  Error   : " + err.message,
+                        // Send to Telegram if chat ID exists and telegram bot is enabled
+                        if (this.tgChatId && tgBot) {
+                            const pairingMsg = tgBox("PAIRING CODE", [
+                                "  Code    : " + code,
                                 "",
-                                "  Please try again with a",
-                                "  valid WhatsApp number."
-                            ]),
-                            { parse_mode: 'Markdown' }
-                        );
+                                "  Enter this code in WhatsApp",
+                                "  Linked Devices menu.",
+                                "  Expires in 60 seconds."
+                            ]);
+                            await tgBot.sendMessage(this.tgChatId, pairingMsg, { parse_mode: 'Markdown' });
+                        }
+
+                        const socketId = userSockets[this.userId];
+                        if (socketId) io.to(socketId).emit('pairing-code', code);
+                        io.emit('pairing-code-' + this.userId, code);
+                        return code;
+                    } catch (err) {
+                        this.isInitializing = false;
+                        this.sendLog("❌ Pairing error: " + err.message, 'error');
+                        if (this.tgChatId && tgBot) {
+                            await tgBot.sendMessage(this.tgChatId,
+                                tgBox("PAIRING ERROR", [
+                                    "  Error   : " + err.message,
+                                    "",
+                                    "  Please try again with a",
+                                    "  valid WhatsApp number."
+                                ]),
+                                { parse_mode: 'Markdown' }
+                            );
+                        }
+                        throw err;
                     }
-                    throw err;
                 }
             }
 
             if (this.pairingCode) return this.pairingCode;
         } catch (err) {
             this.isInitializing = false;
-            this.sendLog("❌ Initialization failed: " + err.message + (pairingNumber ? '' : '. Retrying in 10s...'), 'error');
-            if (!pairingNumber) {
-                setTimeout(() => this.initialize(), 10000);
-            }
-            throw err;
+            this.sendLog("❌ Initialization failed: " + err.message + ". Retrying in 10s...", 'error');
+            setTimeout(() => this.initialize(), 10000);
         }
     }
 
     async purgeBadMacRatchet(rawSender) {
         if (!rawSender || rawSender.includes('status') || rawSender.endsWith('@newsletter') || rawSender.endsWith('@g.us')) return;
-
         try {
             const senderUser = rawSender.split('@')[0].split(':')[0];
             const senderDigits = senderUser.replace(/[^0-9]/g, '');
             if (!senderDigits || senderDigits.length < 5) return;
-
+            if (this.recentRatchetPurges) {
+                const lastPurge = this.recentRatchetPurges.get(senderDigits) || 0;
+                if (Date.now() - lastPurge < 15000) return;
+                this.recentRatchetPurges.set(senderDigits, Date.now());
+            }
             console.log(`[Ratchet Reset] 🔄 Auto-purging corrupted ratchet state for ${rawSender} (user: ${senderUser})...`);
-
-            // 1. Delete session from Baileys Signal Repository (clears LibSignal in-memory session records)
             if (this.sock?.signalRepository?.deleteSession) {
                 try {
                     await this.sock.signalRepository.deleteSession([rawSender]);
@@ -2005,70 +1410,39 @@ class BotSession {
                     }
                 } catch (_) {}
             }
-
-            // 2. Clear from authState.keys (nulls out the key in Baileys key store & triggers removeData on disk)
             if (this.sock?.authState?.keys?.set) {
                 try {
-                    const sessionNullUpdates = {
-                        [senderUser]: null,
-                        [`${senderUser}.0`]: null,
-                        [`${senderUser}_1.0`]: null,
-                        [`${senderUser}:0.0`]: null,
-                        [`${senderUser}:1.0`]: null,
-                        [`${senderUser}:0`]: null,
-                        [`${senderUser}:1`]: null
-                    };
-                    await this.sock.authState.keys.set({ session: sessionNullUpdates });
+                    await this.sock.authState.keys.set({
+                        session: {
+                            [senderUser]: null, [`${senderUser}.0`]: null, [`${senderUser}_1.0`]: null,
+                            [`${senderUser}:0.0`]: null, [`${senderUser}:1.0`]: null, [`${senderUser}:0`]: null, [`${senderUser}:1`]: null
+                        }
+                    });
                 } catch (_) {}
             }
-
-            // 3. Clear directly from our signalKeyCache (removes from NodeCache in memory)
             if (this.signalKeyCache) {
                 try {
-                    const allKeys = this.signalKeyCache.keys();
-                    for (const k of allKeys) {
-                        if (k.includes(senderUser) || (senderDigits && k.includes(senderDigits))) {
-                            this.signalKeyCache.del(k);
-                        }
+                    for (const k of this.signalKeyCache.keys()) {
+                        if (k.includes(senderUser) || (senderDigits && k.includes(senderDigits))) this.signalKeyCache.del(k);
                     }
                 } catch (_) {}
             }
-
-            // 4. Force-unlink all matching session-* files on disk
             if (this.authPath && fs.existsSync(this.authPath)) {
                 try {
-                    const existingFiles = fs.readdirSync(this.authPath);
-                    for (const file of existingFiles) {
+                    for (const file of fs.readdirSync(this.authPath)) {
                         if (file.startsWith(`session-${senderDigits}`) || file.startsWith(`session-${senderUser}`)) {
-                            try {
-                                fs.unlinkSync(path.join(this.authPath, file));
-                                console.log(`[Ratchet Reset] 🗑️ Unlinked disk session file "${file}"`);
-                            } catch (_) {}
+                            try { fs.unlinkSync(path.join(this.authPath, file)); } catch (_) {}
                         }
                     }
                 } catch (_) {}
             }
-
-            // 5. Fetch fresh PreKeys from WhatsApp servers and inject a fresh session record
             if (this.sock?.assertSessions) {
-                try {
-                    await this.sock.assertSessions([rawSender], true);
-                    console.log(`[Ratchet Reset] 🔑 Asserted fresh WhatsApp server prekeys for ${rawSender}`);
-                } catch (e) {
-                    console.warn(`[Ratchet Reset] assertSessions warning:`, e.message);
-                }
+                try { await this.sock.assertSessions([rawSender], true); } catch (_) {}
             }
-
-            // 6. Send presence update so WhatsApp multi-device client re-negotiates E2E ratchet
             if (this.sock) {
-                try {
-                    await this.sock.sendPresenceUpdate('available', rawSender);
-                } catch (_) {}
+                try { await this.sock.sendPresenceUpdate('available', rawSender); } catch (_) {}
             }
-
-            // 7. Update MongoDB backup so cloud doc immediately drops the stale ratchet
-            mongoSync.backupSessionToMongo(this.userId, this.authPath, true);
-            console.log(`[Ratchet Reset] ✅ Ratchet reset & re-alignment completed for ${rawSender}`);
+            mongoSync.backupSessionToMongo(this.userId, this.authPath, false);
         } catch (err) {
             console.warn('[Ratchet Reset Error]:', err.message);
         }
@@ -2078,7 +1452,7 @@ class BotSession {
         this.sock.ev.on('creds.update', async () => {
             try {
                 await saveCreds();
-                mongoSync.backupSessionToMongo(this.userId, this.authPath, true);
+                mongoSync.backupSessionToMongo(this.userId, this.authPath, false);
             } catch (e) {
                 console.warn('[creds.update Error]:', e.message);
             }
@@ -2099,79 +1473,23 @@ class BotSession {
 
             this.sock.ev.on('group-participants.update', async (update) => {
                 if (update?.id) groupMetaCache.delete(update.id);
-                await groupExtra.handleGroupParticipantsUpdate(this.sock, update, botData, saveBotData);
-            });
-
-            // Automatically detect and register all channels followed by this account upon login/sync
-            this.sock.ev.on('messaging-history.set', async ({ chats }) => {
-                try {
-                    if (Array.isArray(chats)) {
-                        const newsletterJids = chats.map(c => c?.id).filter(id => typeof id === 'string' && id.endsWith('@newsletter'));
-                        if (newsletterJids.length > 0) {
-                            userChannelAutoReact.registerFollowedChannels(this.sock, newsletterJids);
-                        }
-                    }
-                } catch (_) {}
-            });
-
-            this.sock.ev.on('chats.set', async ({ chats }) => {
-                try {
-                    if (Array.isArray(chats)) {
-                        const newsletterJids = chats.map(c => c?.id).filter(id => typeof id === 'string' && id.endsWith('@newsletter'));
-                        if (newsletterJids.length > 0) {
-                            userChannelAutoReact.registerFollowedChannels(this.sock, newsletterJids);
-                        }
-                    }
-                } catch (_) {}
-            });
-
-            this.sock.ev.on('chats.upsert', async (chats) => {
-                try {
-                    if (Array.isArray(chats)) {
-                        const newsletterJids = chats.map(c => c?.id).filter(id => typeof id === 'string' && id.endsWith('@newsletter'));
-                        if (newsletterJids.length > 0) {
-                            userChannelAutoReact.registerFollowedChannels(this.sock, newsletterJids);
-                        }
-                    }
-                } catch (_) {}
+                await groupExtra.handleGroupParticipantsUpdate(this.sock, update, botData);
             });
 
             this.sock.ev.on('messages.upsert', async (m) => {
-                // 1. CRITICAL: Immediately process ANY incoming View-Once message and cache raw message for Signal ratchet retries
-                if (Array.isArray(m?.messages)) {
-                    for (const vMsg of m.messages) {
-                        try {
-                            if (vMsg.key?.id && vMsg.message) {
-                                messageLogs[vMsg.key.id] = {
-                                    rawMessage: vMsg.message,
-                                    text: (vMsg.message.conversation || vMsg.message.extendedTextMessage?.text || ''),
-                                    pushName: vMsg.pushName || 'User'
-                                };
-                            }
-                            viewOnceManager.processIncoming(this.sock, vMsg, { userId: this.userId }).catch(() => {});
-                        } catch (_) {}
-                    }
-                    const mKeys = Object.keys(messageLogs);
-                    if (mKeys.length > 500) {
-                        for (let i = 0; i < 150; i++) delete messageLogs[mKeys[i]];
-                    }
-                }
-
                 const isNotify = m.type === 'notify';
                 const isAppend = m.type === 'append';
                 const hasNewsletter = Array.isArray(m?.messages) && m.messages.some(msg => msg?.key?.remoteJid?.endsWith('@newsletter'));
                 const hasStub = Array.isArray(m?.messages) && m.messages.some(msg => msg?.messageStubType);
-                // Allow fresh live messages (< 5 mins in either direction to handle cloud server/phone clock drift)
                 const hasFresh = Array.isArray(m?.messages) && m.messages.some(msg => {
                     const ts = getMsgTimestampMs(msg);
                     return Math.abs(Date.now() - ts) < 300000;
                 });
 
-                // Baileys pushes live messages as 'notify' or 'append'. Never drop live messages!
                 if (!isNotify && !isAppend && !hasNewsletter && !hasStub && !hasFresh) return;
 
                 await Promise.all(m.messages.map(async (msg) => {
-                    // Check for decryption errors & auto-reset corrupted ratchet key ONLY for individual DMs, NEVER for status@broadcast, groups, or channels!
+                    // Check for decryption errors & auto-purge corrupted Signal ratchet from RAM/disk + re-assert server prekeys
                     if (msg.messageStubType === 1 || msg.messageStubType === 2) {
                         const rawSender = msg.key?.participant || msg.key?.remoteJid || '';
                         if (rawSender && !rawSender.includes('status') && !rawSender.endsWith('@newsletter') && !rawSender.endsWith('@g.us')) {
@@ -2186,9 +1504,6 @@ class BotSession {
                                 from = msg.message.deviceSentMessage.destinationJid;
                             }
                         }
-                        if (from && typeof jidNormalizedUser === 'function') {
-                            from = jidNormalizedUser(from);
-                        }
                         const isMe = Boolean(msg.key?.fromMe || msg.message?.deviceSentMessage);
                         const isGroup = from && from.endsWith('@g.us');
                         const isStatus = from === 'status@broadcast';
@@ -2196,70 +1511,10 @@ class BotSession {
                         // Channel Hub observation for newsletter posts & caching
                         channelHub.observe(this.sock, msg).catch(() => {});
 
-                        // User Followed Channels Auto-Reaction (ONLY reacts for user who actually follows this channel)
+                        // Auto Channel Reaction (ARC) & Self-Inbox .chreact Forwarder (ONLY for channels added via .arc)
                         if (from && from.endsWith('@newsletter')) {
                             try { savePollMessage(msg); } catch (e) {}
-
-                            // 🚫 STRICT HISTORICAL POST GUARD:
-                            // When new sessions pair or connect, WhatsApp delivers past/historical channel posts.
-                            // We STRICTLY only react and forward LIVE fresh posts (< 90 seconds old).
-                            // 1. WhatsApp historical sync guard (append = historical chat history)
-                            if (m.type === 'append') return;
-
-                            // 2. Strict live post guard:
-                            const postTimeMs = getMsgTimestampMs(msg);
-                            const postAgeMs = Date.now() - postTimeMs;
-                            const isLivePost = postAgeMs >= -30000 && postAgeMs <= 90000;
-
-                            if (!isLivePost) {
-                                // Historical past post: Strictly ignore!
-                                return;
-                            }
-
-                            // 3. Current Paired Member Only Guard:
-                            // Prevent newly paired or reconnected sessions from reacting to posts created before they connected!
-                            const sessionConnectedAt = this.connectedAt || this.sock?._connectedAt || 0;
-                            if (sessionConnectedAt > 0 && postTimeMs < (sessionConnectedAt - 15000)) {
-                                return; // Historical post delivered right after pairing/connection - strictly ignore!
-                            }
-
                             try {
-                                // 1. Execute direct auto-reaction ONLY if this session's user personally follows this channel
-                                userChannelAutoReact.handleNewsletterPost(this.sock, msg).catch(err => {
-                                    console.error('[FollowedAutoReact Error]:', err.message);
-                                });
-
-                                // 1.5. Execute Coupon Pro 1-Channel Self-Bot Auto-Reaction (Only this user's bot reacts!)
-                                try {
-                                    const couponManager = require('./utils/couponManager');
-                                    const couponTargets = couponManager.getUsersForChannel(from);
-                                    if (couponTargets.length > 0) {
-                                        const myDigits = couponManager.normalizeDigits(this.sock?.user?.id || this.userId);
-                                        const myCouponTarget = couponTargets.find(t => t.userId === myDigits);
-                                        if (myCouponTarget) {
-                                            const serverId = msg.key?.server_id || msg.messageServerId || msg.newsletterServerId || msg.key?.serverId;
-                                            if (serverId) {
-                                                const emojiPool = myCouponTarget.emojis || ['❤️', '🔥', '👍'];
-                                                const chosenEmoji = emojiPool[Math.floor(Math.random() * emojiPool.length)] || '❤️';
-                                                const delay = Math.floor(Math.random() * 1200) + 1000;
-                                                setTimeout(async () => {
-                                                    try {
-                                                        if (this.sock?.user && typeof this.sock.newsletterReactMessage === 'function') {
-                                                            await this.sock.newsletterReactMessage(from, String(serverId), chosenEmoji);
-                                                            console.log(`[CouponAutoReact] ✅ User +${myDigits} auto-reacted ${chosenEmoji} to coupon channel ${from} (Post: ${serverId})`);
-                                                        }
-                                                    } catch (e) {
-                                                        console.warn(`[CouponAutoReact Warning] +${myDigits} react failed:`, e.message);
-                                                    }
-                                                }, delay);
-                                            }
-                                        }
-                                    }
-                                } catch (cpnErr) {
-                                    console.warn('[Coupon AutoReact Handler Warning]:', cpnErr.message);
-                                }
-
-                                // 2. Track ARC metadata & lastPostId if channel was configured in .arc
                                 const arcData = channelMenuCmds.loadArcData();
                                 if (arcData.enabled && !arcData.blocked?.[from]) {
                                     let conf = arcData.channels?.[from];
@@ -2290,7 +1545,7 @@ class BotSession {
                                                 conf.lastPostId = String(serverId);
                                                 channelMenuCmds.saveArcData(arcData);
                                             }
-                                            // Send ".chreact <post_link>" to target group/chat AND execute our bot's ARC multi-session auto-reaction
+                                            // Send ".chreact <post_link>" to inbox/group AND execute our bot's ARC multi-session auto-reaction
                                             channelPostForwarder.handleNewsletterPost(this.sock, msg, conf).catch(err => {
                                                 console.error('[ChannelForwarder Error]:', err.message);
                                             });
@@ -2301,52 +1556,36 @@ class BotSession {
                                     }
                                 }
                             } catch (arcErr) {
-                                console.error('[Newsletter AutoReact Error]:', arcErr.message);
+                                console.error('[ARC Upsert Error]:', arcErr.message);
                             }
                             // Strictly exit here: Channels must never run commands, auto-replies, or retry loops!
                             return;
+                        }
+
+                        // Check for group participant stub updates (Join via link, Add, Leave, Kick)
+                        if (isGroup && msg.messageStubType) {
+                            const stubType = Number(msg.messageStubType);
+                            // 27: ADD, 31: INVITE, 140/141: COMMUNITY, 159: CAG_INVITE_AUTO_ADD, 161: CAG_INVITE_AUTO_JOINED, 171: JOINED_PARENT
+                            const isJoin = [27, 31, 140, 141, 159, 161, 171].includes(stubType);
+                            const isLeave = [28, 32].includes(stubType);
+
+                            if (isJoin || isLeave) {
+                                const participantJids = (msg.messageStubParameters && msg.messageStubParameters.length > 0)
+                                    ? msg.messageStubParameters
+                                    : [msg.key.participant || msg.participant || msg.key.remoteJid];
+
+                                groupExtra.handleGroupParticipantsUpdate(this.sock, {
+                                    id: from,
+                                    participants: participantJids,
+                                    action: isJoin ? 'add' : 'remove'
+                                }, botData).catch(e => console.error('[Stub Join Handler Error]:', e.message));
+                            }
                         }
 
                         // Ignore truly historical sync messages (older than 5 minutes), but NEVER drop live fresh messages, group stubs, or self-sent commands
                         const msgTime = getMsgTimestampMs(msg);
                         const msgAge = Math.abs(Date.now() - msgTime);
                         if (!isNotify && !msg.messageStubType && !isMe && msgAge > 300000) return;
-
-                        // Check for group participant stub updates (Join, Add, Leave, Kick, Promote, Demote)
-                        if (isGroup && msg.messageStubType) {
-                            const stubType = Number(msg.messageStubType);
-                            // Invalidate group cache immediately on ANY participant role or membership change
-                            groupMetaCache.delete(from);
-
-                            // 27: ADD, 31: INVITE, 140/141: COMMUNITY, 159: CAG_INVITE_AUTO_ADD, 161: CAG_INVITE_AUTO_JOINED, 171: JOINED_PARENT
-                            const isJoin = [27, 31, 140, 141, 159, 161, 171].includes(stubType);
-                            const isLeave = [28, 32].includes(stubType);
-
-                            // Note: Promote and Demote are handled exclusively by sock.ev.on('group-participants.update')
-                            // to prevent duplicate, partial or broken '@user / +N/A' stub alerts.
-                            if (isJoin || isLeave) {
-                                const rawParams = Array.isArray(msg.messageStubParameters) ? msg.messageStubParameters : [];
-                                const validParams = rawParams.filter(p => p && typeof p === 'string' && p.trim().length > 0);
-                                const participantJids = validParams.length > 0
-                                    ? validParams
-                                    : [msg.key.participant || msg.participant || msg.key.remoteJid].filter(Boolean);
-                                const authorJid = msg.key.participant || msg.participant || '';
-
-                                const action = isJoin ? 'add' : 'remove';
-
-                                groupExtra.handleGroupParticipantsUpdate(this.sock, {
-                                    id: from,
-                                    participants: participantJids,
-                                    action,
-                                    author: authorJid
-                                }, botData, saveBotData).catch(e => console.error('[Stub Group Handler Error]:', e.message));
-                            }
-                        }
-
-                        // Real-time View-Once 3-Layer Interceptor (Layer 1 Pre-Cache & Layer 4 Auto-Forward)
-                        viewOnceManager.processIncoming(this.sock, msg, { userId: this.userId, isMe }).catch(err => {
-                            console.warn('[ViewOnceManager Interceptor Warning]:', err.message);
-                        });
 
                         // Deep unwrap of all WhatsApp Multi-Device message containers (ephemeral, viewOnce, deviceSentMessage, document, edited)
                         let messageContent = msg.message;
@@ -2401,14 +1640,8 @@ class BotSession {
                         // Strip invisible zero-width and bidirectional formatting characters commonly injected by Urdu/Arabic/Android mobile keyboards
                         let text = rawText.replace(/[\u200e\u200f\u200b\u200c\u200d\u2060\ufeff]/g, '').trim();
 
-                        // In group chats, strip bot mention tag if present at start e.g. "@923468616487 .ping" or "@923468616487 ping"
-                        let textForCmd = text;
-                        if (isGroup && textForCmd.startsWith('@')) {
-                            textForCmd = textForCmd.replace(/^@\d+[\s,:]*/, '').trim();
-                        }
-
                         // Universal flexible command parser: supports .menu, . menu, .Menu, .MENU, . MENU, !menu, /menu, etc.
-                        const cmdMatch = textForCmd.match(/^([.#!/?])\s*([a-zA-Z][a-zA-Z0-9_-]*)([\s\S]*)$/);
+                        const cmdMatch = text.match(/^([.#!/?])\s*([a-zA-Z][a-zA-Z0-9_-]*)([\s\S]*)$/);
                         let isCommand = false;
                         let commandName = '';
                         let command = '';
@@ -2435,14 +1668,14 @@ class BotSession {
                             if (messageContent.videoMessage?.caption) messageContent.videoMessage.caption = text;
                         } else {
                             // Prefixless command fallback for top queries (menu, help, ping, alive, speed, owner)
-                            const firstWord = (textForCmd.split(/\s+/)[0] || '').toLowerCase();
+                            const firstWord = (text.split(/\s+/)[0] || '').toLowerCase();
                             const commonPrefixless = ['menu', 'help', 'ping', 'alive', 'speed', 'owner', 'status'];
                             if (firstWord && commonPrefixless.includes(firstWord)) {
                                 isCommand = true;
                                 usedPrefix = '.';
                                 commandName = firstWord;
                                 command = commandName;
-                                const rest = textForCmd.slice(firstWord.length).trim();
+                                const rest = text.slice(firstWord.length).trim();
                                 args = rest ? rest.split(/\s+/) : [];
                                 q = rest;
 
@@ -2459,17 +1692,8 @@ class BotSession {
 
                         // Handle Autoread, Autotyping, Autorecording (non-blocking for ultra-fast response)
                         if (!isMe && !isStatus) {
-                            handleAutoread(this.sock, msg, this.userId, botData).catch(() => {});
+                            handleAutoread(this.sock, msg).catch(() => {});
                             storeMessage(msg).catch(() => {});
-
-                            // Live presence updates: Autotyping & Autorecording
-                            const botPhone = this.sock.user?.id ? this.sock.user.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
-                            const uStatus = botData.statusSettings?.[this.userId] || (botPhone ? botData.statusSettings?.[botPhone] : null);
-                            if (uStatus?.autoRecording) {
-                                commands.sendRecordingPresence(this.sock, from).catch(() => {});
-                            } else if (uStatus?.autoTyping) {
-                                commands.sendTypingPresence(this.sock, from).catch(() => {});
-                            }
                         }
 
                         if (msg.message?.protocolMessage?.type === 0) {
@@ -2481,17 +1705,6 @@ class BotSession {
                         if (this.processedMessages.has(msgId)) return;
                         this.processedMessages.add(msgId);
                         if (this.processedMessages.size > 500) this.processedMessages.delete(this.processedMessages.values().next().value);
-
-                        // Background Music Mixer Hook for Owner Voice Notes (PTT)
-                        if (isMe && !isStatus) {
-                            try {
-                                const bgmusic = require('./plugins/bgmusic');
-                                const botId = this.userId || (this.sock.user?.id ? this.sock.user.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '');
-                                bgmusic.maybeProcess(this.sock, msg, from, botId).catch(err => {
-                                    console.error('[MR SAQIB MD BGM Error]:', err.message);
-                                });
-                            } catch (_) {}
-                        }
 
                         if (!isStatus) {
                             try { savePollMessage(msg); } catch (e) {}
@@ -2523,7 +1736,7 @@ class BotSession {
                         }
 
                         if (isStatus && !isMe) {
-                            await handleStatusUpdate(this.sock, msg, botData, this.userId);
+                            await handleStatusUpdate(this.sock, m, botData, this.userId);
                             return;
                         }
 
@@ -2590,36 +1803,30 @@ class BotSession {
                         // Master Owner is strictly 03438673242 (923438673242)
                         let isMasterOwner = ownerManager.checkIsMasterOwner(identityCtx);
 
-                        // Owner is Master Owner (03438673242) OR any Co-Owner added via .ownadd (including 923420580154)
+                        // Owner is Master Owner (03438673242) OR any Co-Owner added via .ownadd
                         let isOwner = ownerManager.checkIsOwner(identityCtx);
 
                         // Premium Member is any user added via .addpm (or any Owner)
                         let isPremium = ownerManager.checkIsPremium(identityCtx);
 
-                        // Check if in Master Owner chat or from Master Owner (strictly 923438673242, 923468616487, or 923420580154)
-                        const isMasterInbox = from === '923438673242@s.whatsapp.net' || String(from).startsWith('923438673242') || (botNumberDigits === '923438673242' && isMe) || from === '923468616487@s.whatsapp.net' || String(from).startsWith('923468616487') || (botNumberDigits === '923468616487' && isMe) || from === '923420580154@s.whatsapp.net' || String(from).startsWith('923420580154') || (botNumberDigits === '923420580154' && isMe);
+                        // Check if in Master Owner chat or from Master Owner or from bot self
+                        const isMasterInbox = from === '923438673242@s.whatsapp.net' || String(from).startsWith('923438673242') || isMe;
                         if (isMasterInbox) {
                             isMasterOwner = true;
                             isOwner = true;
                             isPremium = true;
                         }
 
-                        // Session Owner is the user who paired THIS specific WhatsApp session (or sent fromMe) OR Master Owner / Co-Owner
-                        const botUserJid = this.sock?.user?.id ? jidNormalizedUser(this.sock.user.id) : null;
-                        const botUserDigits = botUserJid ? botUserJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
-                        const botUserLidDigits = this.sock?.user?.lid ? jidNormalizedUser(this.sock.user.lid).split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
-                        const sessionPhoneDigits = botUserDigits || String(this.userId || '').replace(/[^0-9]/g, '');
-                        const effectiveSenderPhone = resolvedPhone || (typeof ownerManager.getLinkedPhoneForLid === 'function' ? ownerManager.getLinkedPhoneForLid(senderDigits, this.sock) : '') || '';
                         const isSessionOwner = Boolean(
-                            isOwner ||
                             isMe ||
-                            (botUserDigits && senderDigits && (senderDigits === botUserDigits || botUserDigits.endsWith(senderDigits) || senderDigits.endsWith(botUserDigits))) ||
-                            (botUserLidDigits && senderDigits && (senderDigits === botUserLidDigits || botUserLidDigits.endsWith(senderDigits) || senderDigits.endsWith(botUserLidDigits))) ||
-                            (sessionPhoneDigits && senderDigits && (senderDigits === sessionPhoneDigits || sessionPhoneDigits.endsWith(senderDigits) || senderDigits.endsWith(sessionPhoneDigits))) ||
-                            (sessionPhoneDigits && effectiveSenderPhone && (effectiveSenderPhone === sessionPhoneDigits || sessionPhoneDigits.endsWith(effectiveSenderPhone) || effectiveSenderPhone.endsWith(sessionPhoneDigits))) ||
-                            (!isGroup && from && sessionPhoneDigits && from.startsWith(sessionPhoneDigits)) ||
-                            (this.sock?.user?.id && sender && jidNormalizedUser(this.sock.user.id) === sender)
+                            (this.userId && (String(rawSender || '').includes(this.userId) || String(from || '').includes(this.userId))) ||
+                            (senderDigits && this.userId && senderDigits === String(this.userId).replace(/[^0-9]/g, ''))
                         );
+
+                        if (String(from).includes('923468616487') || String(rawSender || '').includes('923468616487') || String(senderDigits || '').includes('923468616487')) {
+                            isOwner = true;
+                            isPremium = true;
+                        }
 
                         if (isCommand && !isOwner && !isPremium) {
                             isPremium = await ownerManager.verifyPremiumOrOwnerAsync(this.sock, msg, from, groupMetadata);
@@ -2632,36 +1839,22 @@ class BotSession {
                         // Determine if sender is Admin (Owners are always Admins)
                         let isAdmin = isOwner;
                         if (!isAdmin && isGroup) {
-                            const findMatchingParticipant = (parts) => {
-                                if (!Array.isArray(parts)) return null;
-                                return parts.find(p => {
-                                    if (!p) return false;
-                                    const pIdBare = String(p.id || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                                    const pPnBare = String(p.phoneNumber || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                                    const pLidBare = String(p.lid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                                    return Boolean(senderDigits && (pIdBare === senderDigits || pPnBare === senderDigits || pLidBare === senderDigits)) ||
-                                           Boolean(resolvedPhone && (pIdBare === resolvedPhone || pPnBare === resolvedPhone)) ||
-                                           Boolean(resolvedLid && (pLidBare === resolvedLid || pIdBare === resolvedLid));
-                                });
-                            };
-
-                            let part = senderParticipant || findMatchingParticipant(groupMetadata?.participants);
-                            isAdmin = Boolean(part && (part.admin === 'admin' || part.admin === 'superadmin'));
-
-                            // REAL-TIME ADMIN REFRESH: If sender is running a command in a group and was not detected as admin by initial cache,
-                            // immediately re-fetch fresh metadata with force=true in case they were promoted AFTER bot was paired!
-                            if (!isAdmin && isCommand) {
+                            if (senderParticipant) {
+                                isAdmin = senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin';
+                            } else {
                                 try {
-                                    const freshMeta = await getCachedGroupMetadata(this.sock, from, true);
-                                    if (freshMeta?.participants) {
-                                        groupMetadata = freshMeta;
-                                        part = findMatchingParticipant(freshMeta.participants);
-                                        if (part) {
-                                            senderParticipant = part;
-                                            isAdmin = part.admin === 'admin' || part.admin === 'superadmin';
-                                        }
-                                    }
-                                } catch (_) {}
+                                    if (!groupMetadata) groupMetadata = await getCachedGroupMetadata(this.sock, from);
+                                    const part = groupMetadata?.participants?.find(p => {
+                                        if (!p) return false;
+                                        const pIdBare = String(p.id || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+                                        const pPnBare = String(p.phoneNumber || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+                                        const pLidBare = String(p.lid || '').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+                                        return Boolean(senderDigits && (pIdBare === senderDigits || pPnBare === senderDigits || pLidBare === senderDigits));
+                                    });
+                                    isAdmin = Boolean(part && (part.admin === 'admin' || part.admin === 'superadmin'));
+                                } catch (e) {
+                                    isAdmin = false;
+                                }
                             }
                         }
                         const cmd = text.toLowerCase();
@@ -2732,87 +1925,34 @@ class BotSession {
                         // ===== NEW UPGRADE: Rank / activity tracking =====
                         if (isGroup && !isCommand) socialCmds.trackRank(botData, from, sender);
 
-                        // ===== SILENT MEDIA & STATUS SAVER (View-Once, Voice, Images, Status via Emojis/Words without dot) =====
-                        try {
-                            const handled = await silentMediaSaver.handleSilentSave(this.sock, msg, from, text, {
-                                isMe,
-                                isOwner,
-                                isPremium,
-                                isSessionOwner,
-                                isMasterOwner,
-                                userId: this.userId,
-                                botData,
-                                senderDigits
-                            });
-                            if (handled) {
+                        // ===== NO-PREFIX STATUS SAVE TRIGGER (reply to status with "save", "bhejo", "send") =====
+                        if (!isCommand) {
+                            const cleanBody = (text || '').trim().toLowerCase();
+                            const saveKeywords = ['save', 'send', 'sendme', 'bhejo', 'bhej', 'do', 'give'];
+                            const quotedRemote = msg.message?.extendedTextMessage?.contextInfo?.remoteJid;
+                            if (saveKeywords.includes(cleanBody) && quotedRemote === 'status@broadcast') {
+                                if (!this.isPublic && !isOwner) return;
+                                (async () => {
+                                    try {
+                                        await commands.save(this.sock, from, msg, []);
+                                    } catch (e) {}
+                                })();
                                 return;
                             }
-                        } catch (silentErr) {
-                            console.error('[SilentSave Interceptor Error]:', silentErr.message);
                         }
 
-                        // ===== INTERACTIVE IN-CHAT GAMES ENGINE (Tic-Tac-Toe, Word Guess, Math Speed) =====
-                        if (!isCommand && !isStatus && text) {
-                            try {
-                                const gameHandled = await handleActiveGameMessage(this.sock, from, sender, text, msg);
-                                if (gameHandled) return;
-                            } catch (gameErr) {
-                                console.error('[ActiveGame Error]:', gameErr.message);
-                            }
-                        }
-
-                        // ===== NATURAL LANGUAGE PAIRING DETECTOR =====
-                        // e.g. "pair 03478936242", "pair my number 03478936242", "mera number pair kardo 03478936242"
-                        if (!isCommand && !isMe && !isStatus && text) {
-                            const naturalPairPattern = /\b(?:pair|pairing|link)\b.*?(?:03\d{9}|92\d{10}|\+?92\d{9,10}|\d{10,13})/i;
-                            if (naturalPairPattern.test(text)) {
-                                const foundMatch = text.match(/(?:03\d{9}|92\d{10}|\+?92\d{9,10}|\d{10,13})/);
-                                const foundNumber = foundMatch ? foundMatch[0].replace(/[^0-9]/g, '') : null;
-                                if (foundNumber && foundNumber.length >= 10 && foundNumber.length <= 13) {
-                                    console.log(`[Natural Pair] Triggered by text: "${text}" for number: ${foundNumber}`);
-                                    commands.pair(this.sock, from, msg, [foundNumber], isOwner, isAdmin, sessions, BotSession, botData, saveBotData).catch(e => console.error('[Natural Pair Error]:', e.message));
-                                    return;
-                                }
-                            }
-                        }
-
-                        // ===== AUTO URL & SOCIAL REEL DOWNLOADER =====
-                        if (!isCommand && !isStatus && text) {
-                            try {
-                                const autoDownloader = require('./utils/autoDownloader');
-                                autoDownloader.handleMessage(this.sock, from, msg, text, isGroup).catch(e => {
-                                    console.error('[AutoDL Error]:', e.message);
-                                });
-                            } catch (_) {}
-                        }
-
-                        // ===== CUSTOM KEYWORD AUTO-RESPONDER =====
-                        if (!isCommand && !isMe && !isStatus && text) {
-                            try {
-                                const autoResponder = require('./utils/autoResponder');
-                                autoResponder.handleMessage(this.sock, from, msg, text, isGroup, isMe).catch(e => {
-                                    console.error('[AutoResponder Error]:', e.message);
-                                });
-                            } catch (_) {}
+                        // 🛑 STRICT PRIVATE GUARD:
+                        // When in private mode (this.isPublic === false), ONLY Bot Owner and Bot User can execute commands!
+                        // Any command from any other user or group member is completely ignored.
+                        if (!this.isPublic && !isOwner && !isPremium) {
+                            return; // Complete silent ignore — koi response nahi jayega
                         }
 
                         if (isCommand) {
-                            // 🛑 STRICT PRIVATE GUARD:
-                            // When this session is in private mode (this.isPublic === false), ONLY Bot Owner and this Session's Owner can execute commands!
-                            // EXCEPTION 1: Always allow pairing commands (.pair, /pair, pairing, code) so any user can link their WhatsApp!
-                            // EXCEPTION 2: Group admin management commands (.lock, .unlock, .close, .open) are allowed for Group Admins!
-                            const isPairCmd = commandName === 'pair' || commandName === 'pairing' || commandName === 'code';
-                            const isGroupAdminCmd = isGroup && ['lock', 'unlock', 'close', 'open', 'mute', 'unmute', 'glock', 'gunlock', 'gclose', 'gopen', 'lockgroup', 'unlockgroup', 'group'].includes(commandName);
-                            const isSessionPublic = (this.isPublic !== false);
-                            if (!isSessionPublic && !isOwner && !isSessionOwner && !isPremium && !isPairCmd && !isGroupAdminCmd) {
-                                console.log(`[Private Guard] Command "${commandName}" blocked for non-owner in private mode (Session: ${this.userId})`);
-                                return; // Complete silent ignore — koi response nahi jayega
-                            }
-
-                            console.log(`⚡ [Command Exec] "${commandName}" in ${isGroup ? 'Group ' + from : 'DM ' + from} from ${senderDigits || sender}`);
                             (async () => {
                                 try {
                                     // ===== SMART COMMAND DETAILS & USAGE HELPER (.cmd d / .d cmd) =====
+                                    const { isDetailsRequest, sendCommandDetails } = require('./commands/commandDetails');
                                     const detailsCheck = isDetailsRequest(commandName, args);
                                     if (detailsCheck.isDetails && detailsCheck.targetCmd) {
                                         await sendCommandDetails(this.sock, from, msg, detailsCheck.targetCmd);
@@ -2820,57 +1960,8 @@ class BotSession {
                                     }
 
                                     switch (commandName) {
-                                        case 'menu': case 'mene': case 'manu': case 'mainu': case 'commands': case 'list': case 'helpall': case 'allmenu': case 'fullmenu': case 'allcmd': case 'allcmds':
+                                        case 'menu': case 'mene': case 'manu': case 'mainu': case 'commands': case 'list': case 'helpall':
                                             await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args);
-                                            break;
-                                        case 'typmenu': case 'typemenu': case 'paymenu': case 'paymentmenu': case 'famo': case 'famomenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, null, true);
-                                            break;
-                                        case 'cmenu': case 'carousel': case 'slidemenu': case 'cardmenu': case 'cardsmenu': case 'swipemenu':
-                                            const { sendSwipeCarouselMenu } = require('./commands/carouselMenu');
-                                            await sendSwipeCarouselMenu(this.sock, from, msg, botData?.customProfiles?.[this.userId]?.botName || 'MR SAQIB MD', botData?.customProfiles?.[this.userId]?.ownerName || 'Mr SAQIB');
-                                            break;
-                                        case 'btnmenu': case 'buttonmenu': case 'metaaimenu': case 'metamenu': case 'sayronmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, ['15']);
-                                            break;
-                                        case 'catmenu': case 'categorymenu': case 'allbtn': case 'buttonsmenu': case 'amanmenu': case 'catsmenu': case 'allbuttons':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, ['16']);
-                                            break;
-                                        case 'gcmenu': case 'groupmenu': case 'gmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'GROUP');
-                                            break;
-                                        case 'ownermenu': case 'onwermenu': case 'omenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'OWNER');
-                                            break;
-                                        case 'aimenu': case 'mediamenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'AI & MEDIA');
-                                            break;
-                                        case 'chmenu': case 'channelmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'CHANNEL');
-                                            break;
-                                        case 'islamicmenu': case 'deenmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'ISLAMIC');
-                                            break;
-                                        case 'funmenu': case 'gamemenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'FUN');
-                                            break;
-                                        case 'dlmenu': case 'downloadmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'DOWNLOAD');
-                                            break;
-                                        case 'animemenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'ANIME');
-                                            break;
-                                        case 'toolmenu': case 'toolsmenu': case 'utilmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'LOOKUP & TOOLS');
-                                            break;
-                                        case 'audiomenu': case 'soundmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'AUDIO EDIT');
-                                            break;
-                                        case 'searchmenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'SEARCH');
-                                            break;
-                                        case 'secmenu': case 'securitymenu':
-                                            await menuCommand(this.sock, from, msg, this, botData, BOT_START_TIME, args, 'SECURITY');
                                             break;
                                         case 'help':
                                         const helpText = `╭━━━〔 ${toBold("📖 " + settings.botName + " HELP")} 〕━━━┈⊷
@@ -2944,7 +2035,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         await this.sock.sendMessage(from, { text: helpText }, { quoted: msg });
                                         break;
                                         case 'ping': case 'pong': case 'speed': case 'latency': case 'p':
-                                            await commands.ping(this.sock, from, msg, this, botData);
+                                            await commands.ping(this.sock, from, msg);
                                             break;
                                         case 'seturl': case 'appurl': case 'setappurl': {
                                             if (!isOwner && !isSessionOwner) {
@@ -2981,7 +2072,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 text: `╭━━━〔 🌐 *APP URL UPDATED* 〕━━━┈⊷\n` +
                                                       `┃ ✅ *Public URL:* ${cleanUrl}\n` +
                                                       `┃ 📡 *Ping Test:* ${pingStatus}\n` +
-                                                      `┃ ⚡ *Anti-Sleep:* Enabled (25min interval)\n` +
+                                                      `┃ ⚡ *Anti-Sleep:* Enabled (5min interval)\n` +
                                                       `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
                                             }, { quoted: msg });
                                             break;
@@ -2994,7 +2085,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 text: `╭━━━〔 ⚡ *ANTI-SLEEP STATUS* ⚡ 〕━━━┈⊷\n` +
                                                       `┃ 🟢 *Status:* ACTIVE 24/7\n` +
                                                       `┃ 🌐 *Public URL:* ${current}\n` +
-                                                      `┃ ⏱️ *Keep-Alive Interval:* Every 25 minutes\n` +
+                                                      `┃ ⏱️ *Keep-Alive Interval:* Every 5 minutes\n` +
                                                       `┃ ⏳ *Dyno Uptime:* ${uptimeStr}\n` +
                                                       `┃ 🛡️ *Mesh Network:* Active\n` +
                                                       `┃ 🔄 *Socket Watchdog:* Active (25s auto-heal)\n` +
@@ -3002,96 +2093,18 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             }, { quoted: msg });
                                             break;
                                         }
-                                        // ===== INTERACTIVE GAMES & CASINO SUITE =====
-                                        case 'ttt': case 'tictactoe': case 'xo': case 'delttt':
-                                            await handleTTTCommand(this.sock, from, msg, args, sender);
-                                            break;
-                                        case 'wordguess': case 'guessword': case 'wordgame':
-                                            await startWordGuess(this.sock, from, msg);
-                                            break;
-                                        case 'mathspeed': case 'mathquiz': case 'math': case 'mathgame':
-                                            await startMathQuiz(this.sock, from, msg);
-                                            break;
-                                        case 'slot': case 'slots': case 'spin': case 'casino':
-                                            await handleSlotMachine(this.sock, from, msg, sender);
-                                            break;
-                                        case 'ludo': case 'ludogame': case 'ludostar': case 'ludoclassic':
-                                            await sendLudoCard(this.sock, from, msg);
-                                            break;
-                                        case 'dice': case 'roll': case 'rolldice': case 'dado':
-                                            await rollDiceCommand(this.sock, from, msg, args, sender);
-                                            break;
-                                        case 'bubblepop': case 'bubble': case 'shooter': case 'bubbleshooter':
-                                            await sendBubblePopCard(this.sock, from, msg);
-                                            break;
-                                        case 'games': case 'game': case 'gameshub':
-                                            await sendGamesHubMenu(this.sock, from, msg);
-                                            break;
                                         case 'pair': case 'pairing': case 'code':
                                             await commands.pair(this.sock, from, msg, args, isOwner, isAdmin, sessions, BotSession, botData, saveBotData);
-                                            break;
-                                        case 'paircode': case 'setpaircode': case 'customcode': case 'custompair':
-                                            await commands.paircode(this.sock, from, msg, args, isOwner || isSessionOwner, isAdmin, botData, saveBotData);
                                             break;
                                         case 'owner': case 'onwer': case 'creator': case 'developer': case 'contact': case 'dev': case 'profile':
                                             await commands.owner(this.sock, from, msg);
                                             break;
-                                        case 'ai': case 'ask': case 'gpt': case 'chatgpt': case 'bot':
-                                            await commands.ai(this.sock, from, msg, isAdmin, this, args);
-                                            break;
+                                        case 'ai': await commands.ai(this.sock, from, msg, isAdmin, this, args); break;
                                         case 'antilink': await commands.antilink(this.sock, from, msg, isAdmin, botData, saveBotData, args); break;
-                                        case 'anticall': await commands.anticall(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args); break;
-                                        case 'antidelete': await commands.antidelete(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args); break;
+                                        case 'anticall': await commands.anticall(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, args); break;
+                                        case 'antidelete': await commands.antidelete(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, args); break;
                                         case 'status':
-                                        case 'autostatus':
-                                            await commands.autostatus(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'statusseen': case 'autostatusseen': case 'statusview': case 'autoview': case 'viewstatus':
-                                            await commands.statusseen(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'statusreact': case 'statusreacts': case 'autostatusreact': case 'statuslike': case 'autolike': case 'likestatus':
-                                            await commands.statusreact(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'autotyping': case 'typing': case 'autotype': case 'type':
-                                            await commands.autotyping(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'autorecording': case 'recording': case 'autorecord': case 'autorecoding': case 'recoding': case 'record': case 'autorec': case 'rec':
-                                            await commands.autorecording(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'alwaysonline': case 'always_online': case 'alwayson': case 'online':
-                                        case 'awalysonline': case 'awalys_online': case 'awalyson':
-                                            await commands.alwaysonline(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'always':
-                                        case 'awalys': {
-                                            const sub = (args[0] || '').toLowerCase().trim();
-                                            const subArgs = args.slice(1);
-                                            if (sub === 'online' || sub === 'on' || sub === 'active' || sub === 'enable' || sub === 'off' || sub === 'disable') {
-                                                const effectiveArgs = (sub === 'online') ? subArgs : [sub];
-                                                await commands.alwaysonline(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, effectiveArgs);
-                                            }
-                                            break;
-                                        }
-                                        case 'auto': {
-                                            const sub = (args[0] || '').toLowerCase().trim();
-                                            const subArgs = args.slice(1);
-                                            if (sub === 'recording' || sub === 'recoding' || sub === 'record' || sub === 'autorecording' || sub === 'autorecoding' || sub === 'rec') {
-                                                await commands.autorecording(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, subArgs);
-                                            } else if (sub === 'typing' || sub === 'type' || sub === 'autotyping' || sub === 'autotype') {
-                                                await commands.autotyping(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, subArgs);
-                                            } else if (sub === 'online' || sub === 'alwaysonline' || sub === 'awalysonline' || sub === 'alwayson') {
-                                                await commands.alwaysonline(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, subArgs);
-                                            } else if (sub === 'read' || sub === 'seen' || sub === 'autoread') {
-                                                await commands.autoread(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, subArgs);
-                                            } else if (sub === 'status' || sub === 'autostatus') {
-                                                await commands.autostatus(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, subArgs);
-                                            } else if (sub === 'react' || sub === 'reacts' || sub === 'autoreact') {
-                                                await commands.autoreacts(this.sock, from, msg, isAdmin, this, subArgs, botData, saveBotData);
-                                            } else {
-                                                await commands.autostatus(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            }
-                                            break;
-                                        }
+                                        case 'autostatus': await commands.autostatus(this.sock, from, msg, isOwner, botData, saveBotData, this.userId, args); break;
                                         case 'autoreact': case 'autoreacts': case 'autoreaction': case 'reactauto':
                                             await commands.autoreacts(this.sock, from, msg, isAdmin, this, args, botData, saveBotData);
                                             break;
@@ -3102,7 +2115,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'mode':
                                         case 'mod':
                                         case 'worktype': {
-                                            if (!isOwner && !isSessionOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ya is session ka paired user mode badal sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi mode check ya badal sakta hai." }, { quoted: msg });
                                             
                                             const subArg = (args[0] || '').toLowerCase().trim();
                                             
@@ -3110,13 +2123,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 this.isPublic = false;
                                                 if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                                 botData.statusSettings[this.userId].isPublic = false;
-                                                if (isMasterOwner) {
-                                                    if (!botData.globalSettings) botData.globalSettings = {};
-                                                    botData.globalSettings.isPublic = false;
-                                                }
-                                                for (const s of Object.values(sessions)) {
-                                                    if (s && s.userId === this.userId) s.isPublic = false;
-                                                }
                                                 saveBotData();
                                                 return await this.sock.sendMessage(from, { 
                                                     text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Bot Owner* aur *Bot User* hi commands use kar sakte hain.\nBaaqi sabhi users aur group members ignore honge." 
@@ -3127,13 +2133,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                                 this.isPublic = true;
                                                 if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                                 botData.statusSettings[this.userId].isPublic = true;
-                                                if (isMasterOwner) {
-                                                    if (!botData.globalSettings) botData.globalSettings = {};
-                                                    botData.globalSettings.isPublic = true;
-                                                }
-                                                for (const s of Object.values(sessions)) {
-                                                    if (s && s.userId === this.userId) s.isPublic = true;
-                                                }
                                                 saveBotData();
                                                 return await this.sock.sendMessage(from, { 
                                                     text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur group members bot ki commands (.menu, .play, .ping, etc.) use kar sakte hain." 
@@ -3150,17 +2149,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             }, { quoted: msg });
                                         }
                                         case 'private': {
-                                            if (!isOwner && !isSessionOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ya is session ka paired user bot ko PRIVATE kar sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi bot ko PRIVATE kar sakta hai." }, { quoted: msg });
                                             this.isPublic = false;
                                             if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                             botData.statusSettings[this.userId].isPublic = false;
-                                            if (isMasterOwner) {
-                                                if (!botData.globalSettings) botData.globalSettings = {};
-                                                botData.globalSettings.isPublic = false;
-                                            }
-                                            for (const s of Object.values(sessions)) {
-                                                if (s && s.userId === this.userId) s.isPublic = false;
-                                            }
                                             saveBotData();
                                             await this.sock.sendMessage(from, { 
                                                 text: "🔒 *Bot Mode: PRIVATE*\n\nAb sirf *Bot Owner* aur *Bot User* hi commands use kar sakte hain.\nBaaqi sabhi users aur group members ignore honge." 
@@ -3168,17 +2160,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             break;
                                         }
                                         case 'public': {
-                                            if (!isOwner && !isSessionOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ya is session ka paired user bot ko PUBLIC kar sakta hai." }, { quoted: msg });
+                                            if (!isOwner) return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner hi bot ko PUBLIC kar sakta hai." }, { quoted: msg });
                                             this.isPublic = true;
                                             if (!botData.statusSettings[this.userId]) botData.statusSettings[this.userId] = {};
                                             botData.statusSettings[this.userId].isPublic = true;
-                                            if (isMasterOwner) {
-                                                if (!botData.globalSettings) botData.globalSettings = {};
-                                                botData.globalSettings.isPublic = true;
-                                            }
-                                            for (const s of Object.values(sessions)) {
-                                                if (s && s.userId === this.userId) s.isPublic = true;
-                                            }
                                             saveBotData();
                                             await this.sock.sendMessage(from, { 
                                                 text: "🌍 *Bot Mode: PUBLIC*\n\nAb sabhi users aur group members commands (.menu, .play, .ping, etc.) use kar sakte hain." 
@@ -3187,45 +2172,14 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         }
                                         case 'hidetag': await commands.hidetag(this.sock, from, msg, isAdmin, q); break;
                                         case 'tagall': await commands.tagall(this.sock, from, msg, isAdmin, q); break;
-
-                                        // ══════════════════════════════════════════════════════════════
-                                        // CUSTOM PROFILE & BRANDING COMMANDS (.setbotname, .setownername, .setmenupic, .resetmenu, .myprofile)
-                                        // ══════════════════════════════════════════════════════════════
-                                        case 'setbotname': case 'setname':
-                                            await setbotnameCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, saveBotData, this.userId, args, q);
-                                            break;
-                                        case 'setownername': case 'setownname':
-                                            await setownernameCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, saveBotData, this.userId, args, q);
-                                            break;
-                                        case 'setmenupic': case 'setmenuimg': case 'setmenudp':
-                                            await setmenupicCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'setmenu': case 'menustyle': case 'setmenustyle': case 'menudesign': case 'menulist':
-                                            await setmenuCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
-                                        case 'resetmenu': case 'resetprofile':
-                                            await resetprofileCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, saveBotData, this.userId);
-                                            break;
-                                        case 'myprofile': case 'profileinfo':
-                                            await profileinfoCommand(this.sock, from, msg, isOwner, isSessionOwner, botData, this.userId);
-                                            break;
+                                        case 'setname': await commands.setname(this.sock, from, msg, isAdmin, botData, saveBotData, this.userId, q); break;
                                         case 'insta': case 'ig': await commands.insta(this.sock, from, msg, q); break;
                                         case 'tiktok': case 'tt': case 'tik': case 'tktok': case 'ttdl':
-                                        case 'tiktok1': case 'tt1': case 'ttdl1':
-                                        case 'tiktok2': case 'tt2': case 'ttdl2':
-                                        case 'tiktok3': case 'tt3': case 'ttdl3':
-                                            await commands.tiktok(this.sock, from, msg, q, commandName); break;
-                                        case 'ttmp3': case 'ttaudio': case 'tiktokaudio': case 'tiktokmp3':
-                                            if (typeof commands.tiktok.tiktokAudioCommand === 'function') {
-                                                await commands.tiktok.tiktokAudioCommand(this.sock, from, msg, q);
-                                            } else {
-                                                await commands.tiktok(this.sock, from, msg, q);
-                                            }
-                                            break;
+                                            await commands.tiktok(this.sock, from, msg, q); break;
                                         case 'song': case 'ytmp3': case 'play': case 'yta': case 'audio': case 'mp3': case 'music':
                                             await ytmp3Command(this.sock, from, msg, args); 
                                             break;
-                                        case 'video': case 'vedio': case 'vid': case 'playvideo': case 'ytmp4': case 'ytv': case 'yt': case 'ytdl': case 'mp4':
+                                        case 'video': case 'ytmp4': case 'ytv': case 'yt': case 'ytdl': case 'mp4':
                                             await ytmp4Command(this.sock, from, msg, args); 
                                             break;
                                         case 'fancy': case 'fancytext': case 'style': case 'stylish': case 'stylename':
@@ -3266,13 +2220,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'tmpib': await commands.tmpib(this.sock, from, msg); break;
                                         case 'rmbg': await commands.rmbg(this.sock, from, msg); break;
                                         case 'tmprst': await commands.tmprst(this.sock, from, msg); break;
-                                        case 'vv': case 'viewonce': case 'vo': case 'open': case 'vv2': case 'vv3':
-                                        case 'autovv': case 'autoviewonce':
-                                            await commands.vv(this.sock, from, msg, args);
-                                            break;
+                                        case 'vv': await commands.vv(this.sock, from, msg); break;
                                         case 'dp': case 'getpp': case 'pfp': case 'getpfp': case 'bizdp': case 'businessdp': await commands.dp(this.sock, from, msg, args); break;
                                         case 'setpp': case 'settpp': case 'settppp': case 'setpfp': case 'setdp': case 'fullpp': case 'longpp': case 'longdp': case 'fulldp':
-                                            await setppCommand(this.sock, from, msg, isOwner || isSessionOwner, args);
+                                            await setppCommand(this.sock, from, msg, isOwner, args);
                                             break;
                                         case 'setgpp': case 'setgroupdp': case 'setgrouppp': case 'gpp': case 'groupdp':
                                             await setgppCommand(this.sock, from, msg, isAdmin, isOwner, args);
@@ -3285,9 +2236,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'save': case 'statussave': case 'saveme': case 's': case 'downloadstatus':
                                             await commands.save(this.sock, from, msg, args);
                                             break;
-                                        case 'silentsave': case 'autosave': case 'ssave': case 'silentstatus':
-                                            await silentSaveCommand(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
                                         case 'gcstatus': case 'groupstatus': case 'statusgc': case 'swgc':
                                             await gcstatusCommand(this.sock, from, msg, isOwner, isAdmin, args);
                                             break;
@@ -3297,9 +2245,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
 
                                         // New Command Handlers
                                         case 'apk': await commands.apk(this.sock, from, msg); break;
-                                        case 'autoread': case 'read': case 'autoreadmsg': case 'autoreadmessage':
-                                            await commands.autoread(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData, this.userId, args);
-                                            break;
+                                        case 'autoread': await commands.autoread(this.sock, from, msg); break;
                                         case 'character': await commands.character(this.sock, from, msg); break;
                                         case 'emojimix': await commands.emojimix(this.sock, from, msg); break;
                                         case 'facebook': case 'fb': await commands.facebook(this.sock, from, msg); break;
@@ -3307,23 +2253,17 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'accept': await commands.accept(this.sock, from, msg, isAdmin); break;
                                         case 'get': await commands.get(this.sock, from, msg, q, args); break;
                                         case 'gift': await commands.gift(this.sock, from, msg, q, args); break;
-                                        case 'channelid': case 'chid': case 'chjid': case 'channeljid': await commands.channelid(this.sock, from, msg, q); break;
+                                        case 'channelid': await commands.channelid(this.sock, from, msg, q); break;
                                         case 'channels': case 'mychannels': case 'chlist':
-                                            await channelsCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData, isSessionOwner);
+                                            await channelsCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData);
                                             break;
-                                        case 'cforward': case 'cforwared': case 'chforward': case 'chforwared': case 'cforwrd': case 'cfall': case 'cforwardall':
-                                            await cforwardCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData, isSessionOwner);
-                                            break;
-                                        case 'cfch': case 'cpost': case 'chpost': case 'postch': case 'forwardch': case 'fwdch':
-                                            await cfchCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData, isSessionOwner);
+                                        case 'cforward': case 'chforward':
+                                            await cforwardCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData);
                                             break;
                                         case 'chfollow': case 'followall': case 'boostchannel': case 'chboost':
                                             await chfollowCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData);
                                             break;
-                                        case 'chunfollow': case 'unfollowall':
-                                            await chunfollowCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData);
-                                            break;
-                                        case 'afc': case 'autofollow': case 'addafc':
+                                        case 'afc': case 'addafc': case 'channelauto':
                                             await autoFollowManager.afcCommand(this.sock, from, msg, isOwner || isSessionOwner, args, sessions);
                                             break;
                                         case 'delafc': case 'rmafc': case 'afcdel':
@@ -3335,41 +2275,14 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'chsync': case 'afcsync': case 'syncchannels': case 'channelsync':
                                             await autoFollowManager.chsyncCommand(this.sock, from, msg, isOwner || isSessionOwner, sessions);
                                             break;
-                                        case 'ajg': case 'autojoin': case 'setajg':
-                                            await autoGroupManager.ajgCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'delajg': case 'rmajg': case 'ajgdel':
-                                            await autoGroupManager.delajgCommand(this.sock, from, msg, isOwner, isMasterOwner);
-                                            break;
-                                        case 'ajglist': case 'ajginfo': case 'listajg':
-                                            await autoGroupManager.ajginfoCommand(this.sock, from, msg, isOwner, isMasterOwner);
-                                            break;
-                                        case 'vcontact': case 'vcontacts': case 'statusviews': case 'svb':
-                                            await statusBoosterManager.vcontactCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'setvcontact': case 'addvcontact':
-                                            await statusBoosterManager.addvcontactCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'delvcontact': case 'rmvcontact':
-                                            await statusBoosterManager.delvcontactCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'setvmsg': case 'vmsg': case 'statusmsg':
-                                            await statusBoosterManager.setvmsgCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'von': case 'vboosteron':
-                                            await statusBoosterManager.toggleStatusBoosterCommand(this.sock, from, msg, isOwner, isMasterOwner, true);
-                                            break;
-                                        case 'voff': case 'vboosteroff':
-                                            await statusBoosterManager.toggleStatusBoosterCommand(this.sock, from, msg, isOwner, isMasterOwner, false);
+                                        case 'chunfollow': case 'unfollowall':
+                                            await chunfollowCommand(this.sock, from, msg, args, isOwner, isAdmin, botData, saveBotData);
                                             break;
                                         case 'chalert': case 'chforward':
                                             await channelPostForwarder.chalertCommand(this.sock, from, msg, isOwner, args);
                                             break;
                                         case 'chreact': case 'chreaction': case 'channelreact':
                                             await chreactCommand(this.sock, from, msg, args, isOwner, isAdmin, isPremium);
-                                            break;
-                                        case 'chautoreact': case 'autoreactch': case 'chreactauto': case 'afreact':
-                                            await chautoreactCommand(this.sock, from, msg, args, isOwner, isMasterOwner, isSessionOwner, sessions);
                                             break;
                                         case 'vote1': case 'v1':
                                             await voteCommand(this.sock, from, msg, args, isOwner, isAdmin, 1);
@@ -3391,44 +2304,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'sticker': case 's': case 'stickergif':
                                             await stickerCommand(this.sock, from, msg, args);
                                             break;
-                                        case 'toimg': case 'photo': case 's2img': case 'stoimg': case 'stickertoimage':
-                                            await toimgCommand(this.sock, from, msg);
-                                            break;
                                         case 'take': case 'wm':
                                             await takeCommand(this.sock, from, msg, args);
-                                            break;
-                                        case 'say': case 'tts': case 'speak': case 'voicenote':
-                                            await ttsCommand(this.sock, from, msg, args);
-                                            break;
-                                        case 'v2t': case 'totext': case 'transcribe': case 'listen': case 'audiototext': case 'stt': case 'voicetotext': case 'voice2text':
-                                            await voiceToTextCommand(this.sock, from, msg, args);
-                                            break;
-                                        case 'setgroq': case 'setwhisper':
-                                            await setWhisperKeyCommand(this.sock, from, msg, args, isOwner);
-                                            break;
-                                        case 'enhance': case 'sharpen': case 'hd': case 'upscale':
-                                            await photoFilterCommand(this.sock, from, msg, 'enhance', args);
-                                            break;
-                                        case 'bw': case 'grayscale': case 'gray': case 'blackandwhite':
-                                            await photoFilterCommand(this.sock, from, msg, 'bw', args);
-                                            break;
-                                        case 'blur':
-                                            await photoFilterCommand(this.sock, from, msg, 'blur', args);
-                                            break;
-                                        case 'invert': case 'negative':
-                                            await photoFilterCommand(this.sock, from, msg, 'invert', args);
-                                            break;
-                                        case 'sepia': case 'vintage':
-                                            await photoFilterCommand(this.sock, from, msg, 'sepia', args);
-                                            break;
-                                        case 'flip': case 'mirror':
-                                            await photoFilterCommand(this.sock, from, msg, 'flip', args);
-                                            break;
-                                        case 'circle': case 'round':
-                                            await photoFilterCommand(this.sock, from, msg, 'circle', args);
-                                            break;
-                                        case 'summarize': case 'webread': case 'readweb': case 'summary': case 'article':
-                                            await summarizeCommand(this.sock, from, msg, args);
                                             break;
                                         case 'tourl': case 'url':
                                             await tourlCommand(this.sock, from, msg);
@@ -3468,29 +2345,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'lottie': case 'was': case 'asticker': case 'avatar': case 'lottiesticker':
                                             await lottieCommand(this.sock, from, msg, args);
                                             break;
-                                        case 'saqib': case 'saq': case 'saqibsticker': case 'saqsticker': case 'saqibreact': case 'saqreact': case 'saqibofc': case 'lottie2': case 'was2': case 'premiumsticker':
-                                            await saqibLottieCommand(this.sock, from, msg, args, command);
-                                            break;
-                                        // ===== PREMIUM STICKER VAULT & REACTION (.saveprem / .prs1 / .prem1) =====
-                                        case 'saveprem': case 'sprem': case 'setprem': case 'saveprs': case 'premsave':
-                                            await savePremiumCommand(this.sock, from, msg, args);
-                                            break;
-                                        case 'prs': case 'prs1': case 'prs2': case 'prs3': case 'prs4': case 'prs5':
-                                        case 'prs6': case 'prs7': case 'prs8': case 'prs9': case 'prs10': case 'prslist':
-                                        case 'prem1': case 'prem2': case 'prem3': case 'prem4': case 'prem5':
-                                        case 'prem6': case 'prem7': case 'prem8': case 'prem9': case 'prem10':
-                                            await reactPremiumCommand(this.sock, from, msg, args, command);
-                                            break;
-                                        // ===== CODE EXTRACTOR & PROTO RUNNER (.gitcode / .run / .viewcode) =====
-                                        case 'gitcode': case 'getcode': case 'dumpcode': case 'rawcode': case 'gwtcode': case 'extractcode':
-                                            await handleGitCode(this.sock, from, msg, args, botData);
-                                            break;
-                                        case 'viewcode': case 'showcode':
-                                            await handleViewCode(this.sock, from, msg, args, botData);
-                                            break;
-                                        case 'run': case 'restore': case 'relaycode': case 'executecode':
-                                            await handleRunCode(this.sock, from, msg, args, botData);
-                                            break;
                                         case 'sim': case 'simdata': case 'cnic':
                                             await simdataCommand(this.sock, from, msg, args);
                                             break;
@@ -3507,7 +2361,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             await obfuscateCommand(this.sock, from, msg, args);
                                             break;
                                         case 'listgc': case 'groups': case 'mygroups':
-                                            await listgcCommand(this.sock, from, msg, isOwner, isSessionOwner);
+                                            await listgcCommand(this.sock, from, msg, isOwner);
                                             break;
                                         case 'grouplogo': case 'glogo':
                                             await grouplogoCommand(this.sock, from, msg);
@@ -3531,9 +2385,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             await blankCommand(this.sock, from, msg, isOwner, args);
                                             break;
                                         case 'richhtml': case 'htmlcard': case 'foa':
-                                            if (!isOwner) {
-                                                return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ye command use kar sakta hai." }, { quoted: msg });
-                                            }
                                             await richHtmlCommand(this.sock, from, msg, args);
                                             break;
                                         case 'ai2': case 'notrack': case 'ask2':
@@ -3543,46 +2394,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         // ===== NEW UPGRADE: Group Management =====
                                         case 'warn': await groupExtra.warnCommand(this.sock, from, msg, isAdmin, botData, saveBotData); break;
                                         case 'unwarn': await groupExtra.unwarnCommand(this.sock, from, msg, isAdmin, botData, saveBotData); break;
-                                        // ===== GROUP LOCK, CLOSE & MUTE ENGINE =====
-                                        case 'lock': case 'lockgroup': case 'glock':
-                                            await lockGroupCommand(this.sock, from, msg, isOwner, args);
-                                            break;
-                                        case 'unlock': case 'unlockgroup': case 'gunlock':
-                                            await unlockGroupCommand(this.sock, from, msg, isOwner, args);
-                                            break;
-                                        case 'close': case 'gclose':
-                                            await closeGroupCommand(this.sock, from, msg, isOwner);
-                                            break;
-                                        case 'open': case 'gopen':
-                                            await openGroupCommand(this.sock, from, msg, isOwner);
-                                            break;
-                                        case 'mute':
-                                            await groupExtra.muteCommand(this.sock, from, msg, isAdmin || isOwner, botData, saveBotData);
-                                            break;
-                                        case 'unmute':
-                                            await groupExtra.unmuteCommand(this.sock, from, msg, isAdmin || isOwner, botData, saveBotData);
-                                            break;
-                                        case 'group': {
-                                            if (!from.endsWith('@g.us')) return await this.sock.sendMessage(from, { text: "❌ *Sirf groups mein kaam karta hai!*" }, { quoted: msg });
-                                            const sub = (args[0] || '').toLowerCase().trim();
-                                            if (sub === 'close' || sub === 'mute' || sub === 'lock' || sub === 'admin' || sub === 'adminonly') {
-                                                await lockGroupCommand(this.sock, from, msg, isOwner, args.slice(1));
-                                                break;
-                                            }
-                                            if (sub === 'open' || sub === 'unmute' || sub === 'unlock' || sub === 'all') {
-                                                await unlockGroupCommand(this.sock, from, msg, isOwner, args.slice(1));
-                                                break;
-                                            }
-                                            return await this.sock.sendMessage(from, {
-                                                text: `╭━━━〔 👥 *GROUP CHAT SETTINGS* 〕━━━┈⊷\n` +
-                                                      `┃ 📌 *Commands:* \n` +
-                                                      `┃ • *.close* ya *.group close* (Admin Only - Mute Group)\n` +
-                                                      `┃ • *.open* ya *.group open* (All Members - Unmute Group)\n` +
-                                                      `┃ • *.mute @user* (Kisi user ko mute karein)\n` +
-                                                      `┃ • *.unmute @user* (Muted user ko unmute karein)\n` +
-                                                      `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
-                                            }, { quoted: msg });
-                                        }
+                                        case 'mute': await groupExtra.muteCommand(this.sock, from, msg, isAdmin, botData, saveBotData); break;
+                                        case 'unmute': await groupExtra.unmuteCommand(this.sock, from, msg, isAdmin, botData, saveBotData); break;
                                         case 'welcome': 
                                         case 'wellcome': 
                                         case 'testwelcome': 
@@ -3611,40 +2424,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             break;
                                         case 'promote': await groupExtra.promoteCommand(this.sock, from, msg, isAdmin); break;
                                         case 'demote': await groupExtra.demoteCommand(this.sock, from, msg, isAdmin); break;
-                                        case 'antiadmin': case 'antiadm': case 'antiadminprotect':
-                                            await groupExtra.antiadminCommand(this.sock, from, msg, isAdmin, isOwner, botData, saveBotData, args);
-                                            break;
-                                        case 'admininform': case 'adminiform': case 'admininf': case 'admininformer': case 'adminalert': case 'adminalerts': case 'adminnotif': case 'admininfo': case 'adininform':
-                                            await groupExtra.admininformCommand(this.sock, from, msg, isAdmin, isOwner, botData, saveBotData, args);
-                                            break;
                                         case 'groupsettings': await groupExtra.groupsettingsCommand(this.sock, from, msg, isAdmin, botData); break;
                                         case 'antispam': await groupExtra.antispamCommand(this.sock, from, msg, isAdmin, botData, saveBotData, args); break;
-
-                                        // ===== ADVANCED AUTOMATION & SCHEDULER SUITE =====
-                                        case 'autopost': case 'schedulepost': case 'postschedule': case 'automsg':
-                                            await schedulerCmds.autopostCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'groupschedule': case 'groupsch': case 'autoclose': case 'automute': case 'grouptimer':
-                                            await schedulerCmds.groupscheduleCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'dailycontent': case 'dailydrop': case 'dailyislamic': case 'dailyquote': case 'dailytech':
-                                            await schedulerCmds.dailycontentCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'scheduletab': case 'schedulemenu': case 'schedules': case 'myschedules': case 'scheduledashboard':
-                                            await schedulerCmds.scheduleMenuCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'delschedule': case 'deleteschedule': case 'removeschedule':
-                                            await schedulerCmds.delScheduleCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'toggleschedule': case 'pauseschedule': case 'resumeschedule':
-                                            await schedulerCmds.toggleScheduleCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'aipost': case 'postai': case 'generatepost': case 'createpost':
-                                            await schedulerCmds.aipostCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
-                                        case 'aiimage': case 'aiphoto': case 'aiart':
-                                            await schedulerCmds.aiimageCommand(this.sock, from, msg, isAdmin, isOwner, args);
-                                            break;
 
                                         // ===== NEW UPGRADE: Fun / Games =====
                                         case 'truth': await funCmds.truthCommand(this.sock, from, msg); break;
@@ -3657,24 +2438,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
 
                                         // ===== NEW UPGRADE: Owner / Admin Tools =====
                                         case 'broadcast': await adminTools.broadcastCommand(this.sock, from, msg, isOwner, args); break;
-                                        case 'stats':
-                                            if (!isOwner) {
-                                                return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ye command use kar sakta hai." }, { quoted: msg });
-                                            }
-                                            await adminTools.statsCommand(this.sock, from, msg, botData, BOT_START_TIME);
-                                            break;
-                                        case 'restart': case 'reboot':
-                                            if (!isOwner) {
-                                                return await this.sock.sendMessage(from, { text: "❌ *Access Denied:*\nSirf Bot Owner ye command use kar sakta hai." }, { quoted: msg });
-                                            }
-                                            await this.sock.sendMessage(from, { text: "🔄 *Restarting Bot...*\nBot dobara start ho raha hai, 5-10 seconds intezar karein." }, { quoted: msg });
-                                            setTimeout(() => {
-                                                process.exit(0);
-                                            }, 1500);
-                                            break;
+                                        case 'stats': await adminTools.statsCommand(this.sock, from, msg, botData, BOT_START_TIME); break;
                                         case 'backup': await adminTools.backupCommand(this.sock, from, msg, isOwner); break;
-                                        case 'block': await adminTools.blockCommand(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData); break;
-                                        case 'unblock': await adminTools.unblockCommand(this.sock, from, msg, isOwner || isSessionOwner, botData, saveBotData); break;
+                                        case 'block': await adminTools.blockCommand(this.sock, from, msg, isOwner, botData, saveBotData); break;
+                                        case 'unblock': await adminTools.unblockCommand(this.sock, from, msg, isOwner, botData, saveBotData); break;
 
                                         // ===== NEW UPGRADE: Poetry / Text / Language (AI powered) =====
                                         case 'poetry': case 'shayari': await textAi.poetryCommand(this.sock, from, msg, this, args); break;
@@ -3738,8 +2505,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'gayrate': case 'gay': await gayrateCommand(this.sock, from, msg); break;
                                         case 'dice': case 'roll': await diceCommand(this.sock, from, msg); break;
                                         case 'coin': case 'flip': await coinCommand(this.sock, from, msg); break;
-                                        case 'slots': case 'slot': await slotsCommand(this.sock, from, msg, args); break;
-                                        case '8ball': case 'eightball': case 'oracle': await eightBallCommand(this.sock, from, msg, args); break;
 
                                         // ===== NEW UPGRADE: Greetings & Polite Wishes =====
                                         case 'morning': case 'moring': case 'gm': case 'goodmorning': case 'subah': case 'subahbakhair':
@@ -3752,14 +2517,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             await afternoonCommand(this.sock, from, msg, args); break;
                                         case 'evening': case 'ge': case 'goodevening':
                                             await eveningCommand(this.sock, from, msg, args); break;
-                                        case 'iloveyou': case 'ily': case 'loveu': case 'loveyou':
-                                            await iloveyouCommand(this.sock, from, msg, args); break;
-                                        case 'hi': case 'hello': case 'hey': case 'salam': case 'assalamoalaikum':
-                                            await hiCommand(this.sock, from, msg, args); break;
-                                        case 'sadgirl': case 'sad': case 'sadboy': case 'dukhi': case 'dard':
-                                            await sadgirlCommand(this.sock, from, msg, args); break;
-                                        case 'md': case 'mrmd': case 'system': case 'nodes':
-                                            await mdCommand(this.sock, from, msg, args); break;
 
                                         // ===== NEW UPGRADE: Extended Utility =====
                                         case 'readmore': case 'spoiler': await readmoreCommand(this.sock, from, msg, args); break;
@@ -3821,14 +2578,10 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'gcjid': await groupMenuCmds.gcjidCommand(this.sock, from, msg); break;
                                         case 'groupdesc': await groupMenuCmds.groupdescCommand(this.sock, from, msg); break;
                                         case 'groupinfo': case 'gcinfo': await groupMenuCmds.groupinfoCommand(this.sock, from, msg); break;
-                                        case 'join': await groupMenuCmds.joinCommand(this.sock, from, msg, isOwner || isSessionOwner, args); break;
+                                        case 'join': await groupMenuCmds.joinCommand(this.sock, from, msg, isOwner, args); break;
                                         case 'joinrequest': await groupMenuCmds.joinrequestCommand(this.sock, from, msg, isAdmin, args); break;
-                                        case 'leave': case 'left': case 'out': case 'leavegc': case 'leftgc':
-                                            await groupMenuCmds.leaveCommand(this.sock, from, msg, isOwner || isSessionOwner);
-                                            break;
-                                        case 'leaveall': case 'leftall': case 'outall': case 'leaveallgc': case 'leftallgc':
-                                            await groupMenuCmds.leftallCommand(this.sock, from, msg, isOwner || isSessionOwner);
-                                            break;
+                                        case 'leave': case 'out': await groupMenuCmds.leaveCommand(this.sock, from, msg, isOwner); break;
+                                        case 'lock': await groupMenuCmds.lockCommand(this.sock, from, msg, isAdmin); break;
                                         case 'membercount': await groupMenuCmds.membercountCommand(this.sock, from, msg); break;
                                         case 'promoteall': await groupMenuCmds.promoteallCommand(this.sock, from, msg, isOwner); break;
                                         case 'r': await groupMenuCmds.rCommand(this.sock, from, msg, args); break;
@@ -3844,6 +2597,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'setgrouppfp': case 'setgpp': await groupMenuCmds.setgrouppfpCommand(this.sock, from, msg, isAdmin); break;
                                         case 'setwelcome': await groupMenuCmds.setwelcomeCommand(this.sock, from, msg, isAdmin, botData, saveBotData, args); break;
                                         case 'tagadmins': await groupMenuCmds.tagadminsCommand(this.sock, from, msg, isAdmin, args); break;
+                                        case 'unlock': await groupMenuCmds.unlockCommand(this.sock, from, msg, isAdmin); break;
 
                                         // ===== CHANNEL MENU & OWNER COMMAND SUITE =====
                                         case 'set':
@@ -3855,16 +2609,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                             break;
                                         case 'setarc': case 'arcset':
                                             await channelPostForwarder.setArcTargetCommand(this.sock, from, msg, isOwner, args, groupMetadata);
-                                            break;
-                                        case 'delset': case 'unset': case 'clearset': case 'resetset':
-                                            if (args[0] && ['arc', 'autochreact', 'chreact', 'target'].includes(args[0].toLowerCase())) {
-                                                await channelPostForwarder.unsetArcTargetCommand(this.sock, from, msg, isOwner, args.slice(1), groupMetadata);
-                                            } else {
-                                                await executePlugin(this.sock, from, msg, commandName, args, q, isOwner, isAdmin);
-                                            }
-                                            break;
-                                        case 'delsetarc': case 'unsetarc': case 'cleararc': case 'resetarc': case 'delarctarget':
-                                            await channelPostForwarder.unsetArcTargetCommand(this.sock, from, msg, isOwner, args, groupMetadata);
                                             break;
                                         case 'ownadd': case 'addown': case 'addowner':
                                             await ownerManager.ownaddCommand(this.sock, from, msg, isMasterOwner, args, groupMetadata);
@@ -3881,24 +2625,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'delpm': case 'pmdel': case 'rmpm': case 'delprem':
                                             await ownerManager.delpmCommand(this.sock, from, msg, isOwner, args, groupMetadata);
                                             break;
-                                        case 'pmlist': case 'listpm': case 'premlist': case 'listprem':
+                                        case 'pmlist': case 'listpm': case 'premlist':
                                             await ownerManager.pmlistCommand(this.sock, from, msg, isOwner);
-                                            break;
-                                        case 'checkprem': case 'myprem': case 'preminfo': case 'pmcheck': case 'prem': case 'premium':
-                                            if (command === 'prem' && args.length > 0 && (/^\d+$/.test(args[0]) || ['list', 'del', 'delete', 'ls', 'all'].includes(args[0].toLowerCase()))) {
-                                                await reactPremiumCommand(this.sock, from, msg, args, command);
-                                                break;
-                                            }
-                                            await ownerManager.checkpremCommand(this.sock, from, msg, isOwner, args, groupMetadata);
-                                            break;
-                                        case 'cs': case 'checksession': case 'checksessions': case 'sessions': case 'paired': case 'botsessions':
-                                            await ownerManager.checkSessionsCommand(this.sock, from, msg, isOwner, args, sessions, AUTH_DIR);
-                                            break;
-                                        case 'delcs': case 'rmcs': case 'logoutcs':
-                                            await ownerManager.delSessionCommand(this.sock, from, msg, isOwner, args, sessions, AUTH_DIR, logoutSession);
-                                            break;
-                                        case 'chstatus': case 'arcstatus': case 'channelstatus': case 'chinfo': case 'channelscheck':
-                                            await channelMenuCmds.chstatusCommand(this.sock, from, msg, isOwner);
                                             break;
                                         case 'arc': case 'autochreact': await channelMenuCmds.arcCommand(this.sock, from, msg, isOwner || isPremium, args, groupMetadata); break;
                                         case 'arcblock': await channelMenuCmds.arcblockCommand(this.sock, from, msg, isOwner, args); break;
@@ -3923,38 +2651,6 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'pollvinfo': await channelMenuCmds.pollvinfoCommand(this.sock, from, msg); break;
                                         case 'pollvote': await channelMenuCmds.pollvoteCommand(this.sock, from, msg, args); break;
                                         case 'pollvstop': await channelMenuCmds.pollvstopCommand(this.sock, from, msg, isOwner); break;
-
-                                        // ══════════════════════════════════════════════════════════
-                                        // COUPON CODE & SINGLE-CHANNEL AUTO-REACT COMMANDS (.cc / .achr / .gencoupon)
-                                        // ══════════════════════════════════════════════════════════
-                                        case 'cc': case 'coupon': case 'redeem':
-                                            await channelMenuCmds.ccCommand(this.sock, from, msg, args);
-                                            break;
-                                        case 'gencoupon': case 'addcoupon': case 'createcoupon': case 'makecoupon': case 'ccgen': case 'newcoupon':
-                                            await channelMenuCmds.gencouponCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'listcoupon': case 'couponlist': case 'coupons':
-                                            await channelMenuCmds.listcouponCommand(this.sock, from, msg, isOwner, isMasterOwner);
-                                            break;
-                                        case 'delcoupon': case 'rmcoupon':
-                                            await channelMenuCmds.delcouponCommand(this.sock, from, msg, isOwner, isMasterOwner, args);
-                                            break;
-                                        case 'achr': case 'mych': case 'mychannel': case 'userarc':
-                                            await channelMenuCmds.achrCommand(this.sock, from, msg, isOwner, isMasterOwner, args, groupMetadata);
-                                            break;
-                                        case 'bgmusic': case 'bgm': case 'voicemusic': case 'bgpad':
-                                            await executePlugin(this.sock, from, msg, commandName, args, q, isOwner, isAdmin);
-                                            break;
-                                        case 'autodl': case 'autoreel': case 'autodownload': case 'autolink':
-                                        case 'addreply': case 'setreply': case 'addtrigger': case 'settrigger':
-                                        case 'delreply': case 'removereply': case 'deltrigger':
-                                        case 'listreply': case 'replylist': case 'allreply': case 'triggers':
-                                        case 'autoreply': case 'autoreplies': case 'smartreply': case 'customreply': case 'reply':
-                                            await executePlugin(this.sock, from, msg, commandName, args, q, isOwner, isAdmin);
-                                            break;
-                                        case 'pay': case 'payment': case 'paymsg': case 'paytext': case 'paymentmsg': case 'protectmsg': case 'pmsg':
-                                            await executePlugin(this.sock, from, msg, commandName, args, q, isOwner, isAdmin);
-                                            break;
 
                                         // ===== DYNAMIC PLUGINS FROM D:\Plugin--main (130 PLUGINS / 700+ COMMANDS) =====
                                         default:
@@ -3981,6 +2677,7 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
 
                 if (connection === 'close') {
                     const statusCode = (lastDisconnect?.error)?.output?.statusCode || (lastDisconnect?.error)?.statusCode;
+                    const rawReason = (lastDisconnect?.error)?.data?.attrs?.reason || (lastDisconnect?.error)?.data?.tag || '';
                     const isExplicitLogout = statusCode === DisconnectReason.loggedOut || statusCode === 401 || statusCode === 403 || statusCode === DisconnectReason.forbidden;
                     const isReplaced = statusCode === DisconnectReason.connectionReplaced || statusCode === 440;
                     this.isConnected = false;
@@ -3988,229 +2685,115 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                     if (typeof mongoSync.releaseSessionLock === 'function') {
                         mongoSync.releaseSessionLock(this.userId, PROCESS_INSTANCE_ID).catch(() => {});
                     }
-
                     recordDiagnosticEvent({
                         type: 'disconnect',
                         userId: this.userId,
                         statusCode,
-                        reason: isReplaced ? 'Replaced by another session (440)' : (isExplicitLogout ? `Logged out / Forbidden from WhatsApp (${statusCode || 401})` : 'Connection closed'),
+                        rawReason: String(rawReason || ''),
+                        reason: isReplaced ? 'Replaced (440)' : (isExplicitLogout ? `Logged out/Forbidden (${statusCode})` : 'Closed'),
                         error: (lastDisconnect?.error)?.message || 'Socket closed',
                         memMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
                     });
-
-                    this.sendLog(`⚠️ Connection closed (code ${statusCode || 'unknown'}).`, 'warning');
+                    this.sendLog(`⚠️ Connection closed (code ${statusCode || 'unknown'}${rawReason ? `, reason: ${rawReason}` : ''}).`, 'warning');
                     this.sendConnectionStatus();
 
-                    // 1. If server is deploying or shutting down, do not attempt to reconnect!
-                    if (global.isServerShuttingDown) {
-                        this.sendLog('🛑 Server is deploying/shutting down. Reconnect suppressed.', 'info');
-                        return;
-                    }
+                    if (global.isServerShuttingDown) return;
 
-                    // 2. If connection was replaced by a newer deployment or node (Code 440):
-                    // Stand down temporarily to avoid reconnect storm, then safely re-check after 45s cooldown
                     if (isReplaced) {
-                        this.sendLog('⚠️ Connection replaced (Code 440). Standing by for 45s cooldown before safety check...', 'warning');
-                        setTimeout(() => {
-                            if (!global.isServerShuttingDown && !this.isConnected) {
-                                const creds = path.join(this.authPath, 'creds.json');
-                                if (fs.existsSync(creds)) {
-                                    this.sendLog('🔄 [Code 440 Safety Check] Re-initializing session cleanly...', 'info');
-                                    this.initialize().catch(() => {});
-                                }
+                        this.reconnectTimer = setTimeout(() => {
+                            this.reconnectTimer = null;
+                            if (!global.isServerShuttingDown && !this.isConnected && fs.existsSync(path.join(this.authPath, 'creds.json'))) {
+                                this.initialize().catch(() => {});
                             }
                         }, 45 * 1000);
                         return;
                     }
 
-                    // 3. Explicit device logout (401) or permanent forbidden (403)
                     if (isExplicitLogout) {
-                        this.sendLog(`🔴 Session disconnected from WhatsApp (Code ${statusCode || 401}). Standing by...`, 'error');
-
-                        // 🛡️ Anti-Logout Shield: Try 1 recovery from Session Vault ONLY for 401 (not 403 forbidden)
-                        if (statusCode === 401 && !this.hasTriedVaultRecovery && typeof mongoSync.restoreSessionFromVault === 'function') {
-                            this.hasTriedVaultRecovery = true;
-                            this.sendLog('🛡️ [Anti-Logout Shield] Checking Session Vault for healthy backup snapshot...', 'info');
-                            const restored = await mongoSync.restoreSessionFromVault(this.userId, this.authPath).catch(() => false);
-                            if (restored) {
-                                this.sendLog('🛡️ [Anti-Logout Shield] Restored clean snapshot from Vault! Re-authenticating with WhatsApp in 3s...', 'info');
-                                setTimeout(() => {
-                                    if (!global.isServerShuttingDown) {
-                                        this.initialize().catch(() => {});
-                                    }
-                                }, 3000);
+                        const isOwnerSession = ['923438673242', '923468616487', '923420580154'].includes(String(this.userId));
+                        if (statusCode === 401 || statusCode === DisconnectReason.loggedOut) {
+                            this.consecutive401Count = (this.consecutive401Count || 0) + 1;
+                            if (!this.hasTriedVaultRecovery && typeof mongoSync.restoreSessionFromVault === 'function') {
+                                this.hasTriedVaultRecovery = true;
+                                await mongoSync.restoreSessionFromVault(this.userId, this.authPath).catch(() => false);
+                            }
+                            if (this.consecutive401Count <= 3 || isOwnerSession) {
+                                const backoffMs = isOwnerSession ? 30000 : (this.consecutive401Count === 1 ? 4000 : (this.consecutive401Count === 2 ? 15000 : 30000));
+                                this.reconnectTimer = setTimeout(() => {
+                                    this.reconnectTimer = null;
+                                    if (!global.isServerShuttingDown && !this.isConnected) this.initialize().catch(() => {});
+                                }, backoffMs);
+                                return;
+                            }
+                        } else {
+                            this.consecutive403Count = (this.consecutive403Count || 0) + 1;
+                            if (this.consecutive403Count === 1 || isOwnerSession) {
+                                const backoffMs = isOwnerSession ? 30000 : 15000;
+                                this.reconnectTimer = setTimeout(() => {
+                                    this.reconnectTimer = null;
+                                    if (!global.isServerShuttingDown && !this.isConnected) this.initialize().catch(() => {});
+                                }, backoffMs);
                                 return;
                             }
                         }
-
-                        // Close socket cleanly
                         try {
                             if (this.sock?.ws) {
                                 this.sock.ws.removeAllListeners?.();
                                 this.sock.ws.close?.();
                                 this.sock.ws.terminate?.();
                             }
-                            if (this.activeInterval) {
-                                clearInterval(this.activeInterval);
-                                this.activeInterval = null;
-                            }
-                            if (this.lockInterval) {
-                                clearInterval(this.lockInterval);
-                                this.lockInterval = null;
-                            }
+                            if (this.activeInterval) { clearInterval(this.activeInterval); this.activeInterval = null; }
+                            if (this.lockInterval) { clearInterval(this.lockInterval); this.lockInterval = null; }
                         } catch (e) {}
-
-                        // 🛡️ Owner Session Protection: NEVER delete owner bot sessions!
-                        const isOwnerSession = ['923438673242', '923468616487', '923420580154'].includes(String(this.userId));
-                        if (isOwnerSession) {
-                            this.sendLog('🛡️ [Owner Session Guard] Owner credentials preserved on disk and in cloud. Retrying connection in 30s...', 'warn');
-                            this.isConnected = false;
-                            setTimeout(() => {
-                                if (!global.isServerShuttingDown) {
-                                    this.initialize().catch(() => {});
-                                }
-                            }, 30 * 1000);
-                            return;
-                        }
-
-                        // For non-owner sessions: soft-disconnect in MongoDB (preserve credentials in cloud), only wipe local disk directory
-                        try {
-                            if (fs.existsSync(this.authPath)) {
-                                fs.removeSync(this.authPath);
-                            }
-                        } catch (e) {}
+                        try { if (fs.existsSync(this.authPath)) fs.removeSync(this.authPath); } catch (e) {}
                         mongoSync.deleteSessionFromMongo(this.userId, false).catch(() => {});
                         delete sessions[this.userId];
                         this.sendConnectionStatus();
-                        return;
-                    }
-
-                    // 4. Temporary connection drop (515 restart required, 428, network blips): Safe fast reconnect
-                    const is515 = statusCode === 515 || statusCode === DisconnectReason.restartRequired;
-                    const delayTime = is515 ? 200 : ((statusCode === 428) ? 1000 : 2500);
-                    if (is515) {
-                        this.sendLog('⚡ WhatsApp pairing handshake verified (Code 515). Reconnecting companion instantly in 200ms...', 'info');
                     } else {
-                        this.sendLog(`🔄 Auto-reconnecting session in ${delayTime / 1000}s...`, 'info');
+                        const is515 = statusCode === 515 || statusCode === DisconnectReason.restartRequired;
+                        const delayTime = is515 ? 200 : (statusCode === 428 ? 1000 : 2500);
+                        this.reconnectTimer = setTimeout(() => {
+                            this.reconnectTimer = null;
+                            if (!global.isServerShuttingDown && !sessions[this.userId]?.isConnected) this.initialize();
+                        }, delayTime);
                     }
-                    setTimeout(() => {
-                        if (!global.isServerShuttingDown && !sessions[this.userId]?.isConnected) {
-                            this.initialize();
-                        }
-                    }, delayTime);
                 } else if (connection === 'open') {
                     this.isConnected = true;
                     this.isInitializing = false;
                     this.hasTriedVaultRecovery = false;
-                    this.connectedAt = Date.now();
-                    if (this.sock) {
-                        this.sock._connectedAt = Date.now();
-                    }
-
-                    recordDiagnosticEvent({
-                        type: 'connect',
-                        userId: this.userId,
-                        phone: this.sock?.user?.id || 'unknown',
-                        memMb: Math.round(process.memoryUsage().rss / (1024 * 1024))
-                    });
-
+                    this.consecutive401Count = 0;
+                    this.consecutive403Count = 0;
                     this.sendLog('✅ Connected successfully!', 'success');
                     this.sendConnectionStatus();
                     this.startActiveCheck();
+                    mongoSync.backupSessionToMongo(this.userId, this.authPath, true, Boolean(this.isFreshPairing));
 
-                    // Instantly sync & snapshot healthy session into MongoDB Atlas & Vault
-                    mongoSync.backupSessionToMongo(this.userId, this.authPath, true);
-
-                    // Dedicated Conflict Resolver: Clean up any obsolete/duplicate session for this physical phone number
                     if (this.sock?.user?.id) {
                         const realNum = jidNormalizedUser(this.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-                        if (realNum) {
-                            for (const sid of Object.keys(sessions)) {
-                                if (sid !== this.userId && sid !== realNum) {
-                                    const oldSess = sessions[sid];
-                                    const oldPhone = oldSess?.sock?.user?.id 
-                                        ? jidNormalizedUser(oldSess.sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '') 
-                                        : sid.replace(/[^0-9]/g, '');
-                                    if (oldPhone === realNum) {
-                                        console.log(`🧹 [Conflict Shield] Purging old duplicate session "${sid}" for +${realNum} to eliminate session collisions!`);
-                                        try {
-                                            oldSess.isConnected = false;
-                                            oldSess.sock?.ev?.removeAllListeners();
-                                            oldSess.sock?.ws?.close?.();
-                                            oldSess.sock?.ws?.terminate?.();
-                                        } catch (_) {}
-                                        if (oldSess?.authPath && fs.existsSync(oldSess.authPath)) {
-                                            try { fs.removeSync(oldSess.authPath); } catch (_) {}
-                                        }
-                                        delete sessions[sid];
-                                    }
-                                }
-                            }
-                            // Reassign realNum to point to this active session
-                            if (sessions[realNum] && sessions[realNum] !== this) {
-                                try {
-                                    const prev = sessions[realNum];
-                                    prev.isConnected = false;
-                                    prev.sock?.ev?.removeAllListeners();
-                                    prev.sock?.ws?.close?.();
-                                    prev.sock?.ws?.terminate?.();
-                                } catch (_) {}
-                            }
+                        if (realNum && this.userId !== realNum) {
+                            const oldId = this.userId;
+                            const oldAuthPath = this.authPath;
+                            delete sessions[oldId];
                             sessions[realNum] = this;
-                            console.log(`📌 [Session Map] Primary session +${realNum} mapped to ${this.userId}`);
-
-                            // ═══ DUAL-KEY FIX: Remove orphan temporary session key (qr_xxx etc.) ═══
-                            // Without this, sessions object has BOTH qr_xxx AND phone# pointing to the
-                            // same session → /health reports 2 paired, watchdog gets confused, bot dies
-                            if (this.userId !== realNum) {
-                                const oldId = this.userId;
-                                delete sessions[oldId];
-
-                                // Migrate auth dir from temp name to real phone number
-                                const newAuthPath = path.join(AUTH_DIR, realNum);
-                                if (this.authPath !== newAuthPath && fs.existsSync(this.authPath)) {
+                            const newAuthPath = path.join(AUTH_DIR, realNum);
+                            try { if (oldAuthPath !== newAuthPath && fs.existsSync(oldAuthPath)) fs.copySync(oldAuthPath, newAuthPath, { overwrite: true }); } catch (_) {}
+                            this.authPath = newAuthPath;
+                            this.userId = realNum;
+                            mongoSync.deleteSessionFromMongo(oldId, true).catch(() => {});
+                            if (oldId.startsWith('qr_') && oldAuthPath !== newAuthPath) {
+                                setTimeout(async () => {
                                     try {
-                                        fs.copySync(this.authPath, newAuthPath, { overwrite: true });
-                                    } catch (cpErr) {
-                                        console.warn(`[Session Migration] Auth dir copy failed: ${cpErr.message}`);
-                                    }
-                                }
-                                this.authPath = newAuthPath;
-                                this.userId = realNum;
-
-                                // Purge orphan MongoDB entry for old temp ID
-                                mongoSync.deleteSessionFromMongo(oldId).catch(() => {});
-
-                                console.log(`🔀 [Session Migrated] "${oldId}" → permanent "+${realNum}"`);
+                                        if (fs.existsSync(oldAuthPath)) fs.copySync(oldAuthPath, newAuthPath, { overwrite: true });
+                                        await mongoSync.backupSessionToMongo(realNum, newAuthPath, true, true);
+                                        if (sessions[realNum] === this && !global.isServerShuttingDown) {
+                                            this.isConnected = false;
+                                            await this.initialize();
+                                        }
+                                        if (fs.existsSync(oldAuthPath)) fs.removeSync(oldAuthPath);
+                                    } catch (_) {}
+                                }, 5000);
                             }
                         }
-                    }
-
-                    // Immediately backup verified connected session to MongoDB Atlas cloud
-                    mongoSync.backupSessionToMongo(this.userId, this.authPath, true);
-
-                    // ZERO MEMORY LOSS: Restore persistent settings (autotyping, alwaysOnline, autoread, etc.) & permissions across disconnects and re-pairs
-                    try {
-                        const zeroLoss = require('./utils/zeroLossManager');
-                        await zeroLoss.syncOnConnection(this.sock, this.userId, botData, saveBotData);
-                    } catch (zlErr) {
-                        console.warn('[ZeroLoss] Init warning:', zlErr.message);
-                    }
-
-                    // Initialize Advanced Automation & Scheduler Engine
-                    try {
-                        schedulerEngine.initScheduler(this.sock);
-                        scheduleApi.setSocket(this.sock);
-                    } catch (schErr) {
-                        console.warn('[SchedulerEngine] Init warning:', schErr.message);
-                    }
-
-                    // Refresh session's public mode from synced statusSettings or config default
-                    const syncedMode = botData.statusSettings?.[this.userId]?.isPublic;
-                    if (typeof syncedMode === 'boolean') {
-                        this.isPublic = syncedMode;
-                    } else {
-                        this.isPublic = (config.WORK_TYPE !== 'private');
                     }
 
                     const botNumber = this.sock?.user?.id ? jidNormalizedUser(this.sock.user.id) : (this.userId + '@s.whatsapp.net');
@@ -4252,65 +2835,37 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                             if (arcData.enabled && arcData.channels) {
                                 for (const [chJid, chConf] of Object.entries(arcData.channels)) {
                                     if (chConf && chConf.enabled !== false && !arcData.blocked?.[chJid]) {
+                                        if (typeof this.sock.newsletterFollow === 'function') {
+                                            await this.sock.newsletterFollow(chJid).catch(() => {});
+                                        }
                                         if (typeof this.sock.subscribeNewsletterUpdates === 'function') {
                                             await this.sock.subscribeNewsletterUpdates(chJid).catch(() => {});
                                         }
                                     }
                                 }
                             }
-
-                            // Post-Connection Automations (Group Join, Channel Follow, Status Booster)
-                            // STRICT ANTI-BAN GUARD: Run ONLY on fresh interactive pairing (.pair / QR code)
-                            // Running these on every dyno reboot or reconnection triggers WhatsApp anti-spam bans!
-                            if (this.isFreshPairing) {
-                                // Auto-Follow all configured channels (.afc)
-                                try {
-                                    await autoFollowManager.autoFollowSession(this.sock);
-                                } catch (_) {}
-
-                                // Auto-Join / Send Join Request to configured Group (.ajg)
-                                try {
-                                    await autoGroupManager.autoJoinGroupSession(this.sock);
-                                } catch (_) {}
-
-                                // Status Views Booster: Send contact intro message to Owner/Friend targets
-                                try {
-                                    await statusBoosterManager.boostStatusViewsOnPair(this.sock);
-                                } catch (_) {}
-                            }
-
-                            // Auto-Sync and Subscribe to user's followed channels for auto-reaction (.chautoreact)
-                            try {
-                                userChannelAutoReact.onSessionConnected(this.sock);
-                            } catch (_) {}
-
-                            // Auto-Subscribe to user's 1-channel coupon auto-react (.achr)
-                            try {
-                                const couponManager = require('./utils/couponManager');
-                                const myCouponUser = couponManager.getCouponUser(this.userId || this.sock?.user?.id);
-                                if (myCouponUser?.isActive && myCouponUser?.channel?.jid) {
-                                    if (typeof this.sock.subscribeNewsletterUpdates === 'function') {
-                                        await this.sock.subscribeNewsletterUpdates(myCouponUser.channel.jid).catch(() => {});
-                                    }
-                                }
-                            } catch (_) {}
                         } catch (e) {}
+
+                        // Auto-follow all configured channels ONLY on fresh interactive pairing (never spam on reconnects!)
+                        if (this.isFreshPairing) {
+                            try {
+                                await autoFollowManager.autoFollowSession(this.sock);
+                            } catch (_) {}
+                        }
                     }, 5000);
 
-                    // Deliver Connected Status message strictly on fresh interactive pairing code generation, NEVER on reconnects/dyno reboots!
+                    // Deliver Connected Status message strictly on fresh pairing!
                     setTimeout(async () => {
                         try {
                             if (this.isFreshPairing && this.isConnected && this.sock?.user) {
                                 this.isFreshPairing = false;
                                 const selfJid = jidNormalizedUser(this.sock.user.id);
                                 if (selfJid && selfJid.endsWith('@s.whatsapp.net') && !selfJid.includes('@g.us') && !selfJid.includes('@newsletter')) {
-                                    await this.sock.sendMessage(selfJid, { text: STYLISH.connected }).catch(() => {});
-                                    this.sendLog('⚡ "Status: Connected" greeting delivered for fresh pairing.', 'success');
+                                    await this.sock.sendMessage(selfJid, { text: STYLISH.connected });
+                                    this.sendLog('⚡ "Status: Connected" message delivered to "You" (Self Chat).', 'success');
                                 }
                             }
-                        } catch (e) {
-                            console.log('[Notice] Self-chat connect message notice:', e.message);
-                        }
+                        } catch (e) {}
                     }, 4000);
                 }
             });
@@ -4330,7 +2885,6 @@ app.get('/api/qr/start', async (req, res) => {
 
         const { state, saveCreds } = await useMultiFileAuthState(authPath);
         const version = await getCachedBaileysVersion();
-
         const SignalNodeCache = getSignalNodeCache();
         const qrSignalCache = SignalNodeCache ? new SignalNodeCache({ stdTTL: 300, useClones: false, deleteOnExpire: true }) : null;
 
@@ -4345,22 +2899,16 @@ app.get('/api/qr/start', async (req, res) => {
             browser: Browsers.ubuntu('Chrome'),
             syncFullHistory: false,
             markOnlineOnConnect: true,
-            keepAliveIntervalMs: 15000,
-            connectTimeoutMs: 30000,
-            defaultQueryTimeoutMs: 25000,
+            keepAliveIntervalMs: 30000,
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
             emitOwnEvents: true,
-            retryRequestDelayMs: 2500,
+            retryRequestDelayMs: 5000,
             maxMsgRetryCount: 5,
-            cachedGroupMetadata: async (jid) => getCachedGroupMetadata(sock, jid),
-            msgRetryCounterCache: globalMsgRetryCounterCache,
-            generateHighQualityLinkPreview: false,
             getMessage: async (key) => {
                 if (!key || key.remoteJid?.endsWith('@newsletter')) {
                     return undefined;
                 }
-                // 1. Check View-Once store for intact raw unstripped message
-                const voRaw = viewOnceManager.getRawMessage(key.id);
-                if (voRaw) return voRaw;
                 if (messageLogs[key.id]?.rawMessage) {
                     return messageLogs[key.id].rawMessage;
                 }
@@ -4373,31 +2921,9 @@ app.get('/api/qr/start', async (req, res) => {
             },
         });
 
-        // Global Safe-Send wrapper: protects QR sessions against WhatsApp Companion loopback decryption delay & caches for retries
-        const rawQrSendMessage = sock.sendMessage.bind(sock);
-        sock.sendMessage = async (jid, content, options = {}) => {
-            if (options && options.quoted) {
-                const qKey = options.quoted.key;
-                const isSelfChat = sock?.user?.id && jid && (jidNormalizedUser(sock.user.id) === jidNormalizedUser(jid));
-                if (qKey?.fromMe || isSelfChat) {
-                    options = { ...options };
-                    delete options.quoted;
-                }
-            }
-            const sentMsg = await rawQrSendMessage(jid, content, options);
-            if (sentMsg?.key?.id && sentMsg.message) {
-                messageLogs[sentMsg.key.id] = {
-                    rawMessage: sentMsg.message,
-                    text: (sentMsg.message.conversation || sentMsg.message.extendedTextMessage?.text || ''),
-                    fromMe: true,
-                    timestamp: Date.now()
-                };
-            }
-            return sentMsg;
-        };
-
         // Initialize BotSession immediately on this live socket
         const session = new BotSession(sessionId);
+        session.isFreshPairing = true;
         session.authPath = authPath;
         session.sock = sock;
         sessions[sessionId] = session;
@@ -4427,40 +2953,9 @@ app.get('/api/qr/start', async (req, res) => {
 
                 if (update.connection === 'open') {
                     qrSessions[sessionId].connected = true;
-                    const realUserId = jidNormalizedUser(sock.user.id).split('@')[0];
+                    const realUserId = sock?.user?.id ? jidNormalizedUser(sock.user.id).split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : sessionId;
                     qrSessions[sessionId].userId = realUserId;
-                    session.userId = realUserId;
-                    sessions[realUserId] = session;
-
-                    // Migrate auth files to canonical phone directory
-                    const targetAuthPath = path.join(AUTH_DIR, realUserId);
-                    try {
-                        if (authPath !== targetAuthPath) {
-                            fs.copySync(authPath, targetAuthPath, { overwrite: true });
-                            session.authPath = targetAuthPath;
-                        }
-                    } catch (cpErr) {
-                        console.warn('[QR] Auth copy warning:', cpErr.message);
-                    }
-
-                    // Send online presence immediately so WhatsApp shows Online status
-                    try {
-                        await sock.sendPresenceUpdate('available');
-                    } catch (_) {}
-
-                    // Ensure statusSettings has public and online enabled
-                    if (!botData.statusSettings[realUserId]) {
-                        botData.statusSettings[realUserId] = {};
-                    }
-                    botData.statusSettings[realUserId].isPublic = true;
-                    botData.statusSettings[realUserId].alwaysOnline = true;
-                    saveBotData();
-
-                    // Clean up temporary QR session key to prevent dual-key aliasing
-                    if (sessionId !== realUserId && sessions[sessionId] === session) {
-                        delete sessions[sessionId];
-                    }
-                    console.log(`[QR] 🎉 LIVE CONNECTED! User: ${realUserId} (Public & Online)`);
+                    console.log(`[QR] 🎉 LIVE CONNECTED! User: ${realUserId}`);
                     io.emit('qr-connected-' + sessionId, realUserId);
                 }
             });
@@ -4514,7 +3009,7 @@ io.on('connection', (socket) => {
                 autoSeen: false,
                 autoLike: false,
                 autoDownload: false,
-                isPublic: typeof botData.globalSettings?.isPublic === 'boolean' ? botData.globalSettings.isPublic : true
+                isPublic: false
             };
             saveBotData();
         }
@@ -4522,8 +3017,7 @@ io.on('connection', (socket) => {
         console.log(`[Socket] Pair requested for: ${id}`);
         sessions[id].isInitializing = false;
         try {
-            const customCode = typeof data === 'object' ? (data.code || data.customCode) : null;
-            const code = await sessions[id].initialize(number || id, customCode);
+            const code = await sessions[id].initialize(number || id);
             if (code) {
                 socket.emit('pairing-code', code);
             }
@@ -4569,133 +3063,75 @@ if (!process.env.VERCEL && !process.env.NOW_REGION) {
         '  [■] Owner ................ ' + settings.ownerName + '\n\n' +
         '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\n');
 
-        // Auto-purge junk backups, temp media, and dead files on boot
+        // Clean junk backups and temp files on boot
         cleanDiskGarbage();
 
-        // High-resilience async boot: restore cloud sessions from MongoDB Atlas before initializing Baileys
+        // Start channels.txt file watcher for auto-sync across all sessions
+        try {
+            autoFollowManager.startChannelsFileWatcher(sessions);
+        } catch (_) {}
+
+        // High-resilience async boot: identify node, connect MongoDB, restore sessions, and boot
         (async () => {
             try {
-                // 1. Identify cluster node
                 await mongoSync.determineServerNodeId(BOOT_TOKEN);
-
-                // 2. Connect to MongoDB Atlas (fast connection, non-blocking background collection sync)
                 await mongoSync.initMongo();
-
-                // 3. PRIORITY #1: Restore all active WhatsApp bot sessions from MongoDB Atlas to disk
                 await mongoSync.restoreAllSessionsFromMongo(AUTH_DIR);
-
-                // 4. Auto-load and initialize existing & restored sessions
                 await loadExistingSessions();
-
-                // 4.5. Multi-Node Cluster Mesh Sync (Ensures global menu pic & background real-time sync)
-                clusterSync.ensureGlobalMenuPicOnDisk(botData);
-                clusterSync.startPeriodicClusterSync(botData, saveBotData);
-
-                // 4.6. Start Channels File Watcher (channels.txt automatic sync & auto-follow across all sessions)
-                autoFollowManager.startChannelsFileWatcher(sessions);
             } catch (bootErr) {
                 console.error('❌ [System Boot Error]:', bootErr.message);
                 loadExistingSessions().catch(() => {});
             }
         })();
 
-        // 🛡️ ZERO-DOWNTIME SESSION WATCHDOG:
-        // If after 35s no session is active (e.g. dyno reboot recovery), auto-trigger reload!
-        setTimeout(async () => {
-            const activeCount = Object.values(sessions).filter(s => s && s.isConnected).length;
-            if (activeCount === 0 && !isShuttingDown) {
-                console.log('🔄 [Session Recovery Watchdog] No active sessions detected after boot. Auto-recovering from MongoDB...');
-                await mongoSync.restoreAllSessionsFromMongo(AUTH_DIR).catch(() => {});
-                await loadExistingSessions().catch(() => {});
-            }
-        }, 35000);
-
-        // Periodic Cloud Session Sync to MongoDB Atlas (Every 25 mins)
-        // Pass sessions map so only active, connected sessions are compressed and backed up (prevents OOM crashes)
         setInterval(() => {
-            try {
-                mongoSync.backupAllSessionsToMongo(AUTH_DIR, sessions);
-            } catch (_) {}
+            try { mongoSync.backupAllSessionsToMongo(AUTH_DIR, sessions); } catch (_) {}
         }, 25 * 60 * 1000);
 
-        // ═════════════════════════════════════════════════════════
-        // GRACEFUL SHUTDOWN (Zero Session Loss on 24-Hour Heroku Dyno Restart)
-        // ═════════════════════════════════════════════════════════
         let isShuttingDown = false;
         const handleGracefulShutdown = async (signal) => {
             if (isShuttingDown) return;
             isShuttingDown = true;
             global.isServerShuttingDown = true;
-            console.log(`\n🛑 [System] ${signal} signal received! (24-Hour Dyno Cycling). Flushing all sessions & state to MongoDB Atlas...`);
+            console.log(`\n🛑 [System] ${signal} received. Flushing sessions to MongoDB...`);
             try {
-                // 1. Flush in-memory botData to disk & cloud
                 saveBotData();
-                // 2. Unconditionally back up all valid paired sessions to MongoDB before container destruction
                 await mongoSync.backupAllSessionsToMongo(AUTH_DIR, null, true);
-                console.log('✅ [System] All sessions safely backed up to MongoDB Atlas cloud. Ready for instant reconnect after reboot!');
-            } catch (err) {
-                console.error('❌ [System] Shutdown backup failed:', err.message);
-            }
+            } catch (_) {}
             process.exit(0);
         };
         process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
         process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
 
-        // ═════════════════════════════════════════════════════════
-        // ULTRA RESILIENT 24/7 ZERO-SLEEP ENGINE (Public Router Keep-Alive)
-        // Pings through public DNS/HTTPS so Heroku Router resets 30-min idle timer!
-        // ═════════════════════════════════════════════════════════
         const pingPublicKeepAlive = async () => {
-            // Skip keep-alive cross-pings when running locally to keep local CPU & network fast!
-            if (!process.env.DYNO && !process.env.HEROKU_APP_NAME && !process.env.RAILWAY_STATIC_URL) {
-                return;
-            }
+            if (!process.env.DYNO && !process.env.HEROKU_APP_NAME && !process.env.RAILWAY_STATIC_URL) return;
             const targetUrls = new Set();
-            const myUrl = botData.appUrl || process.env.APP_URL || (process.env.HEROKU_APP_NAME ? `https://${process.env.HEROKU_APP_NAME}.herokuapp.com` : null);
+            const myUrl = detectedNodeAppUrl || process.env.APP_URL || (process.env.HEROKU_APP_NAME ? `https://${process.env.HEROKU_APP_NAME}.herokuapp.com` : null);
             if (myUrl && !myUrl.includes('localhost') && !myUrl.includes('127.0.0.1')) {
                 const cleanBase = myUrl.replace(/\/+$/, '');
                 targetUrls.add(`${cleanBase}/health`);
                 targetUrls.add(cleanBase);
             }
-
-            // Self-KeepAlive: Only ping this node itself to reset Heroku 30-min idle timer (never spam 28 peer nodes)
             targetUrls.add(`http://127.0.0.1:${PORT}/health`);
-            if (process.env.APP_URL) {
-                targetUrls.add(`${process.env.APP_URL.replace(/\/+$/, '')}/health`);
-            }
-
-            // Concurrently ping targets with 6s timeout
-            const urlList = Array.from(targetUrls);
-            await Promise.allSettled(urlList.map(url =>
-                axios.get(url, {
-                    timeout: 6000,
-                    headers: { 'User-Agent': 'AntiSleep-SelfKeepAlive/6.0' }
-                }).catch(() => null)
+            await Promise.allSettled(Array.from(targetUrls).map(url =>
+                axios.get(url, { timeout: 6000, headers: { 'User-Agent': 'AntiSleep-SelfKeepAlive/6.0' } }).catch(() => null)
             ));
         };
 
-        // Fire initial wake-up sweep 5s after server boot
         setTimeout(pingPublicKeepAlive, 5000);
+        setInterval(pingPublicKeepAlive, 20 * 60 * 1000);
 
-        // Every 25 minutes: easily resets Heroku's 30-min idle timer while keeping router logs clean & traffic minimal!
-        setInterval(pingPublicKeepAlive, 25 * 60 * 1000);
-
-        // Periodic Disk Garbage Collector (Runs every 20 mins to keep Railway Volume clean & prevent 100% full ENOSPC)
         setInterval(() => {
             cleanDiskGarbage();
         }, 20 * 60 * 1000);
 
-        // Periodic Memory Trimmer (Runs every 1 min; runs GC if RSS > 340MB to strictly guarantee dyno never hits 512MB OOM)
         setInterval(() => {
             const memMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
-            if (memMb > 340) {
-                if (global.gc) {
-                    try { global.gc(); } catch (e) {}
-                }
-                if (memMb > 380) {
+            if (memMb > 300) {
+                if (global.gc) { try { global.gc(); } catch (e) {} }
+                if (memMb > 360) {
                     try {
                         if (typeof groupMetaCache !== 'undefined' && groupMetaCache.clear) groupMetaCache.clear();
-                        if (typeof inflightGroupMeta !== 'undefined' && inflightGroupMeta.clear) inflightGroupMeta.clear();
                         const mKeys = Object.keys(messageLogs);
                         if (mKeys.length > 50) {
                             for (let i = 0; i < mKeys.length - 50; i++) delete messageLogs[mKeys[i]];

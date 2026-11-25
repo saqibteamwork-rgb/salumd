@@ -15,12 +15,46 @@
 
 const fs = require('fs-extra');
 const path = require('path');
+const axios = require('axios');
+const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 const OWNERS_FILE = path.join(__dirname, '..', 'data', 'owners.json');
 const AUTH_DIR = path.join(__dirname, '..', 'auth_info');
 const OWNERS_AUTH_BACKUP = path.join(AUTH_DIR, '_owners_store.json');
 const MASTER_OWNER_DIGITS = '923438673242';
 const MASTER_LAST10 = '3438673242';
+
+const CLUSTER_MONITOR_NODES = [
+    { id: 's1', name: 'Heroku-1', url: 'https://saqib-bot-v1-d3ecc6f0292e.herokuapp.com' },
+    { id: 's2', name: 'Heroku-2', url: 'https://saqib-bot-s2-1cceb03e9698.herokuapp.com' },
+    { id: 's3', name: 'Heroku-3', url: 'https://saqibbot3-bb2b46aa1cb4.herokuapp.com' },
+    { id: 's4', name: 'Heroku-4', url: 'https://saqibot4-1469f73b3d77.herokuapp.com' },
+    { id: 's5', name: 'Heroku-5', url: 'https://saqibbot5-5ffa090fe31f.herokuapp.com' },
+    { id: 's6', name: 'Heroku-6', url: 'https://saqibot6-061b6d17645d.herokuapp.com' },
+    { id: 's7', name: 'Heroku-7', url: 'https://saqibot7-b9d00e67a587.herokuapp.com' },
+    { id: 's8', name: 'Heroku-8', url: 'https://saqibbot8-f10fafc8b934.herokuapp.com' },
+    { id: 's9', name: 'Heroku-9', url: 'https://saqibbot9-bebb531508e3.herokuapp.com' },
+    { id: 's10', name: 'Heroku-10', url: 'https://saqibot10-d27e9f3ad01e.herokuapp.com' },
+    { id: 's11', name: 'Heroku-11', url: 'https://saqibbot11-815563078799.herokuapp.com' },
+    { id: 's12', name: 'Heroku-12', url: 'https://saqibbot12-2fb338ff529a.herokuapp.com' },
+    { id: 's13', name: 'Heroku-13', url: 'https://saqibot13-392b066b37a5.herokuapp.com' },
+    { id: 's14', name: 'Heroku-14', url: 'https://saqibbot14-d84e8d59500a.herokuapp.com' },
+    { id: 's16', name: 'Heroku-16', url: 'https://saqibbot16-b071c813d801.herokuapp.com' },
+    { id: 's17', name: 'Heroku-17', url: 'https://saqibot17-a471970ef223.herokuapp.com' },
+    { id: 's18', name: 'Heroku-18', url: 'https://saqibbot18-45854000f60b.herokuapp.com' },
+    { id: 's19', name: 'Heroku-19', url: 'https://saqibbot19-bb306a89a5f4.herokuapp.com' },
+    { id: 's20', name: 'Heroku-20', url: 'https://saqibbot20-317bb68e4db0.herokuapp.com' },
+    { id: 's21', name: 'Heroku-21', url: 'https://saqibbot21-ac7859f5f0fb.herokuapp.com' },
+    { id: 's22', name: 'Heroku-22', url: 'https://saqibbot22-9318c2de0250.herokuapp.com' },
+    { id: 's23', name: 'Heroku-23', url: 'https://saqibot23-1f4bec48d0f2.herokuapp.com' },
+    { id: 's25', name: 'Heroku-25', url: 'https://saqibbot25-46c4cf949a77.herokuapp.com' },
+    { id: 's25b', name: 'Heroku-25B', url: 'https://saqibot25-0974df36edd8.herokuapp.com' },
+    { id: 's26', name: 'Heroku-26', url: 'https://saqibot26-69a8011cc819.herokuapp.com' },
+    { id: 's27', name: 'Heroku-27', url: 'https://saqibot27-1c1d295781fa.herokuapp.com' },
+    { id: 's28', name: 'Heroku-28', url: 'https://saqibbot28-658e7de676c8.herokuapp.com' },
+    { id: 'railway', name: 'Railway', url: 'https://web-production-08da5300.up.railway.app' }
+];
+
 
 // Deduplication set so multiple sessions in the same chat don't send duplicate command replies
 const handledOwnerCmdMsgIds = new Set();
@@ -78,7 +112,25 @@ function extractLidDigits(raw, allowBareDigits = false) {
     return d.length >= 5 ? d : '';
 }
 
+let lastOwnersCheckTime = 0;
+let debouncedSaveTimer = null;
+
+function debouncedSaveOwnersData(data) {
+    if (debouncedSaveTimer) return;
+    debouncedSaveTimer = setTimeout(() => {
+        debouncedSaveTimer = null;
+        try {
+            saveOwnersData(cachedOwnersData || data);
+        } catch (_) {}
+    }, 2000);
+}
+
 function loadOwnersData() {
+    const now = Date.now();
+    if (cachedOwnersData && (now - lastOwnersCheckTime < 3000)) {
+        return cachedOwnersData;
+    }
+    lastOwnersCheckTime = now;
     try {
         const primaryExists = fs.existsSync(OWNERS_FILE);
         const backupExists = fs.existsSync(OWNERS_AUTH_BACKUP);
@@ -104,7 +156,9 @@ function loadOwnersData() {
             if (!Array.isArray(data.masterLids)) data.masterLids = [];
             if (!data.lidMap || typeof data.lidMap !== 'object') data.lidMap = {};
 
-            // Hydrate in-memory map from persisted data
+            const wasPruned = pruneOwnersLidMap(data);
+
+            // Hydrate in-memory map from persisted data (bounded to 5000 entries)
             for (const [k, v] of Object.entries(data.lidMap)) {
                 if (k && v) memoryLidMap.set(k, String(v));
             }
@@ -124,6 +178,9 @@ function loadOwnersData() {
 
             cachedOwnersData = data;
             cachedOwnersMtime = stat.mtimeMs;
+            if (wasPruned) {
+                try { saveOwnersData(data); } catch (_) {}
+            }
             return data;
         }
     } catch (e) {
@@ -140,20 +197,92 @@ function loadOwnersData() {
     return fallback;
 }
 
+function pruneOwnersLidMap(data) {
+    if (!data || !data.lidMap || typeof data.lidMap !== 'object') return false;
+    const keys = Object.keys(data.lidMap);
+    if (keys.length <= 500) return false;
+
+    const keepPhones = new Set([MASTER_OWNER_DIGITS]);
+    const keepLids = new Set((data.masterLids || []).map(String));
+    for (const entry of [...(data.owners || []), ...(data.premium || [])]) {
+        if (!entry) continue;
+        if (typeof entry === 'string') {
+            keepPhones.add(entry.replace(/[^0-9]/g, ''));
+        } else {
+            if (entry.digits) keepPhones.add(String(entry.digits).replace(/[^0-9]/g, ''));
+            if (entry.lid) keepLids.add(String(entry.lid));
+        }
+    }
+    try {
+        const activeSess = global.ProBoySessionManager?.getSessions?.() || {};
+        for (const sid of Object.keys(activeSess)) {
+            const d = String(sid).replace(/[^0-9]/g, '');
+            if (d.length >= 9) keepPhones.add(d);
+        }
+    } catch (_) {}
+
+    const nextMap = {};
+    let extraCount = 0;
+    for (const [k, v] of Object.entries(data.lidMap)) {
+        if (!k || !v) continue;
+        const val = String(v);
+        const isPriv =
+            (k.startsWith('pn:') && keepPhones.has(k.slice(3))) ||
+            (k.startsWith('lid:') && (keepLids.has(k.slice(4)) || keepPhones.has(val)));
+        if (isPriv) {
+            nextMap[k] = val;
+        }
+    }
+    // Preserve up to 200 most recent non-privileged entries
+    const recentEntries = Object.entries(data.lidMap).slice(-200);
+    for (const [k, v] of recentEntries) {
+        if (!k || !v || nextMap[k]) continue;
+        if (extraCount >= 200) break;
+        nextMap[k] = String(v);
+        extraCount++;
+    }
+    data.lidMap = nextMap;
+    return true;
+}
+
 function saveOwnersData(data) {
     try {
         if (!data.lidMap || typeof data.lidMap !== 'object') data.lidMap = {};
+        pruneOwnersLidMap(data);
         data.updatedAt = Date.now();
         fs.ensureDirSync(path.dirname(OWNERS_FILE));
-        fs.writeJsonSync(OWNERS_FILE, data, { spaces: 2 });
+        
+        const payload = JSON.stringify(data, null, 2);
+        const tmpFile = OWNERS_FILE + '.tmp';
+        try {
+            fs.writeFileSync(tmpFile, payload, 'utf8');
+            fs.renameSync(tmpFile, OWNERS_FILE);
+        } catch (_) {
+            try {
+                fs.writeFileSync(OWNERS_FILE, payload, 'utf8');
+            } catch (errWrite) {
+                // Retry once after 50ms if Windows locked file briefly
+                setTimeout(() => {
+                    try { fs.writeFileSync(OWNERS_FILE, payload, 'utf8'); } catch (_) {}
+                }, 50);
+            }
+        }
+
         try {
             fs.ensureDirSync(AUTH_DIR);
-            fs.writeJsonSync(OWNERS_AUTH_BACKUP, data, { spaces: 2 });
-        } catch {}
+            fs.writeFileSync(OWNERS_AUTH_BACKUP, payload, 'utf8');
+        } catch (_) {}
+
         cachedOwnersData = data;
         try {
             cachedOwnersMtime = fs.statSync(OWNERS_FILE).mtimeMs;
-        } catch {}
+        } catch (_) {}
+
+        // Non-blocking Cloud Sync to MongoDB Atlas
+        try {
+            const mongoSync = require('./mongoSync');
+            mongoSync.pushToMongo('owners_data', data, 400);
+        } catch (_) {}
     } catch (e) {
         console.error('[OwnerManager Save Error]:', e.message);
     }
@@ -168,6 +297,14 @@ function learnIdentityMapping(phoneInput, lidInput) {
     if (!phoneDigits || !lidDigits || phoneDigits === lidDigits) return false;
 
     const last10 = phoneDigits.slice(-10);
+    if (memoryLidMap.size > 5000) {
+        // Evict oldest 1000 transient entries to prevent unbounded RAM growth
+        let evicted = 0;
+        for (const k of memoryLidMap.keys()) {
+            memoryLidMap.delete(k);
+            if (++evicted >= 1000) break;
+        }
+    }
     memoryLidMap.set(`pn:${phoneDigits}`, lidDigits);
     if (last10.length === 10) memoryLidMap.set(`pn10:${last10}`, lidDigits);
     memoryLidMap.set(`lid:${lidDigits}`, phoneDigits);
@@ -175,15 +312,31 @@ function learnIdentityMapping(phoneInput, lidInput) {
     const data = loadOwnersData();
     let changed = false;
 
-    if (!data.lidMap) data.lidMap = {};
-    if (data.lidMap[`pn:${phoneDigits}`] !== lidDigits || data.lidMap[`lid:${lidDigits}`] !== phoneDigits) {
-        data.lidMap[`pn:${phoneDigits}`] = lidDigits;
-        data.lidMap[`lid:${lidDigits}`] = phoneDigits;
-        changed = true;
+    // Only persist lidMap to disk/MongoDB for Master Owner, Co-Owners, Premium users, or active paired bot accounts!
+    // Persisting random group participants bloats owners.json to 2.5MB+ and fills MongoDB Atlas quota!
+    const isMaster = phoneDigits === MASTER_OWNER_DIGITS || (last10 && phoneDigits.endsWith(MASTER_LAST10));
+    const isOwnerOrPrem = [...(data.owners || []), ...(data.premium || [])].some(entry => {
+        if (!entry) return false;
+        const ed = typeof entry === 'string' ? normalizePhoneDigits(entry) : normalizePhoneDigits(entry.digits);
+        return ed && (ed === phoneDigits || (last10 && ed.slice(-10) === last10));
+    });
+    let isActiveBot = false;
+    try {
+        const sMap = global.ProBoySessionManager?.getSessions?.();
+        isActiveBot = Boolean(sMap && sMap[phoneDigits]);
+    } catch (_) {}
+
+    if (isMaster || isOwnerOrPrem || isActiveBot) {
+        if (!data.lidMap) data.lidMap = {};
+        if (data.lidMap[`pn:${phoneDigits}`] !== lidDigits || data.lidMap[`lid:${lidDigits}`] !== phoneDigits) {
+            data.lidMap[`pn:${phoneDigits}`] = lidDigits;
+            data.lidMap[`lid:${lidDigits}`] = phoneDigits;
+            changed = true;
+        }
     }
 
     // Master Owner LID auto-learn
-    if (phoneDigits === MASTER_OWNER_DIGITS || (last10 && phoneDigits.endsWith(MASTER_LAST10))) {
+    if (isMaster) {
         if (!data.masterLids.includes(lidDigits)) {
             data.masterLids.push(lidDigits);
             changed = true;
@@ -221,7 +374,7 @@ function learnIdentityMapping(phoneInput, lidInput) {
     }
 
     if (changed) {
-        saveOwnersData(data);
+        debouncedSaveOwnersData(data);
     }
     return true;
 }
@@ -488,6 +641,8 @@ function registerSessionIdentity(sock) {
  * Collects all candidate Phone Numbers and LIDs for a message sender
  */
 function collectSenderCandidates(ctx = {}) {
+    if (ctx && ctx._candidates) return ctx._candidates;
+
     const {
         sock,
         msg,
@@ -587,10 +742,14 @@ function collectSenderCandidates(ctx = {}) {
         learnIdentityMapping([...phoneSet][0], [...lidSet][0]);
     }
 
-    return {
+    const result = {
         phones: [...phoneSet],
         lids: [...lidSet]
     };
+    if (ctx && typeof ctx === 'object') {
+        ctx._candidates = result;
+    }
+    return result;
 }
 
 /**
@@ -627,14 +786,16 @@ function checkIsOwner(ctx) {
 
     for (const o of (data.owners || [])) {
         if (!o) continue;
-        const oDigits = normalizePhoneDigits(o.digits);
+        const oDigits = normalizePhoneDigits(typeof o === 'string' ? o : o.digits);
         const oLast10 = oDigits.length >= 10 ? oDigits.slice(-10) : '';
-        const oLid = extractLidDigits(o.lid || '', true) || (oDigits ? getLinkedLidForPhone(oDigits, ctx.sock) : '');
+        const oLid = typeof o === 'string'
+            ? (extractLidDigits(o, true) || (oDigits ? getLinkedLidForPhone(oDigits, ctx.sock) : ''))
+            : (extractLidDigits(o.lid || '', true) || (oDigits ? getLinkedLidForPhone(oDigits, ctx.sock) : ''));
 
         if (oDigits) {
             for (const p of phones) {
                 if (p === oDigits || (oLast10 && p.endsWith(oLast10))) {
-                    if (lids.length > 0 && !o.lid) learnIdentityMapping(oDigits, lids[0]);
+                    if (lids.length > 0 && typeof o === 'object' && !o.lid) learnIdentityMapping(oDigits, lids[0]);
                     return true;
                 }
             }
@@ -642,7 +803,7 @@ function checkIsOwner(ctx) {
         if (oLid) {
             for (const l of lids) {
                 if (l === oLid) {
-                    if (phones.length > 0 && !o.digits) learnIdentityMapping(phones[0], oLid);
+                    if (phones.length > 0 && typeof o === 'object' && !o.digits) learnIdentityMapping(phones[0], oLid);
                     return true;
                 }
             }
@@ -663,17 +824,26 @@ function checkIsPremium(ctx) {
 
     const { phones, lids } = collectSenderCandidates(ctx);
     const data = loadOwnersData();
+    const now = Date.now();
 
     for (const pm of (data.premium || [])) {
         if (!pm) continue;
-        const pDigits = normalizePhoneDigits(pm.digits);
+
+        // Skip expired subscriptions
+        if (pm.expiresAt && typeof pm.expiresAt === 'number' && pm.expiresAt <= now) {
+            continue;
+        }
+
+        const pDigits = normalizePhoneDigits(typeof pm === 'string' ? pm : pm.digits);
         const pLast10 = pDigits.length >= 10 ? pDigits.slice(-10) : '';
-        const pLid = extractLidDigits(pm.lid || '', true) || (pDigits ? getLinkedLidForPhone(pDigits, ctx.sock) : '');
+        const pLid = typeof pm === 'string'
+            ? (extractLidDigits(pm, true) || (pDigits ? getLinkedLidForPhone(pDigits, ctx.sock) : ''))
+            : (extractLidDigits(pm.lid || '', true) || (pDigits ? getLinkedLidForPhone(pDigits, ctx.sock) : ''));
 
         if (pDigits) {
             for (const p of phones) {
                 if (p === pDigits || (pLast10 && p.endsWith(pLast10))) {
-                    if (lids.length > 0 && !pm.lid) learnIdentityMapping(pDigits, lids[0]);
+                    if (lids.length > 0 && typeof pm === 'object' && !pm.lid) learnIdentityMapping(pDigits, lids[0]);
                     return true;
                 }
             }
@@ -681,7 +851,7 @@ function checkIsPremium(ctx) {
         if (pLid) {
             for (const l of lids) {
                 if (l === pLid) {
-                    if (phones.length > 0 && !pm.digits) learnIdentityMapping(phones[0], pLid);
+                    if (phones.length > 0 && typeof pm === 'object' && !pm.digits) learnIdentityMapping(phones[0], pLid);
                     return true;
                 }
             }
@@ -727,17 +897,6 @@ async function verifyPremiumOrOwnerAsync(sock, msg, from, groupMetadata = null) 
         await resolveIdentityPairAsync({ digits: null, lid: lids[0] }, sock);
     } else if (phones.length > 0 && lids.length === 0) {
         await resolveIdentityPairAsync({ digits: phones[0], lid: null }, sock);
-    }
-
-    // Also resolve any unlinked entries in data.premium and data.owners
-    const data = loadOwnersData();
-    for (const entry of [...(data.premium || []), ...(data.owners || [])]) {
-        if (!entry) continue;
-        if (entry.digits && !entry.lid) {
-            await resolveIdentityPairAsync({ digits: entry.digits, lid: null }, sock);
-        } else if (entry.lid && !entry.digits) {
-            await resolveIdentityPairAsync({ digits: null, lid: entry.lid }, sock);
-        }
     }
 
     return checkIsPremium(ctx);
@@ -902,8 +1061,8 @@ async function ownaddCommand(sock, from, msg, isMasterOwner, args = [], groupMet
         return await sock.sendMessage(from, {
             text: `╭━━━〔 🔒 *MASTER OWNER ONLY* 〕━━━┈⊷\n` +
                   `┃ ❌ *Access Denied!*\n` +
-                  `┃ Ye command sirf Master Owner\n` +
-                  `┃ (*03438673242*) run kar sakta hai!\n` +
+                  `┃ Ye command sirf *Master Owner*\n` +
+                  `┃ run kar sakta hai!\n` +
                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
@@ -960,9 +1119,9 @@ async function ownaddCommand(sock, from, msg, isMasterOwner, args = [], groupMet
               `┃ 👤 *User:* ${tagDisplay}\n` +
               `┃ 🆔 *ID:* \`${target.digits || target.lid}\`\n` +
               `┃ 🛡️ *Role:* Co-Owner (Full Command Access)\n` +
-              `┃ 👑 *Added By:* Master Owner (03438673242)\n` +
+              `┃ 👑 *Added By:* Master Owner (MR SAQIB)\n` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`,
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
         mentions: mentionList
     }, { quoted: msg });
 }
@@ -977,7 +1136,7 @@ async function owndelCommand(sock, from, msg, isMasterOwner, args = [], groupMet
     if (!isMasterOwner) {
         await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
         return await sock.sendMessage(from, {
-            text: `❌ *Access Denied!* Sirf Master Owner (*03438673242*) owner remove kar sakta hai.`
+            text: `❌ *Access Denied!* Sirf *Master Owner* hi owner remove kar sakta hai.`
         }, { quoted: msg });
     }
 
@@ -1011,7 +1170,7 @@ async function owndelCommand(sock, from, msg, isMasterOwner, args = [], groupMet
               `┃ 👤 *Removed:* ${target.display}\n` +
               `┃ 🔒 *Status:* Owner Access Revoked\n` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
     }, { quoted: msg });
 }
 
@@ -1025,7 +1184,7 @@ async function ownlistCommand(sock, from, msg, isOwner) {
     }
 
     const data = loadOwnersData();
-    let listText = `┃ 👑 *1. +923438673242* (Master Owner)\n`;
+    let listText = `┃ 👑 *1. MR SAQIB* (Master Owner)\n`;
     data.owners.forEach((o, i) => {
         const label = o.digits ? `+${o.digits}` : `LID:${o.lid}`;
         listText += `┃ 🛡️ *${i + 2}. ${label}* (Co-Owner)\n`;
@@ -1035,13 +1194,143 @@ async function ownlistCommand(sock, from, msg, isOwner) {
         text: `╭━━━〔 👑 *AUTHORIZED BOT OWNERS* 〕━━━┈⊷\n` +
               `${listText}` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
     }, { quoted: msg });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DURATION & EXPIRATION HELPERS FOR TIMED PREMIUM MEMBERSHIP
+// ─────────────────────────────────────────────────────────────────────────────
+
+function extractDurationFromArgs(args) {
+    if (!args || !args.length) return { durationArg: null, cleanArgs: [] };
+    let durationArg = null;
+    const cleanArgs = [];
+
+    const durationRegex = /^(\d+)\s*(s|m|h|d|w|mo|month|months|y|year|years)?$/i;
+    const permRegex = /^(perm|permanent|unlimited|lifetime|forever|inf|infinity)$/i;
+
+    for (let i = 0; i < args.length; i++) {
+        const arg = String(args[i]).trim();
+        if (!durationArg && (permRegex.test(arg) || (durationRegex.test(arg) && !/^\d{9,16}$/.test(arg)))) {
+            // Also check two-word duration e.g. '30' 'days' or '1' 'month'
+            if (/^\d+$/.test(arg) && i + 1 < args.length && /^(days?|months?|weeks?|hours?|years?)$/i.test(args[i + 1])) {
+                durationArg = `${arg} ${args[i + 1]}`;
+                i++;
+                continue;
+            }
+            durationArg = arg;
+        } else {
+            cleanArgs.push(arg);
+        }
+    }
+
+    return { durationArg, cleanArgs };
+}
+
+function parseDuration(input) {
+    if (!input) {
+        const ms = 30 * 24 * 60 * 60 * 1000;
+        return { ms, label: '30 Days (1 Month)', expiresAt: Date.now() + ms, isPermanent: false };
+    }
+
+    const str = String(input).trim().toLowerCase();
+    if (['perm', 'permanent', 'unlimited', 'lifetime', 'forever', 'inf', 'infinity'].includes(str)) {
+        return { ms: null, label: 'Permanent (Lifetime)', expiresAt: null, isPermanent: true };
+    }
+
+    const match = /^(\d+)\s*([a-z]+)?$/i.exec(str);
+    if (!match) {
+        const ms = 30 * 24 * 60 * 60 * 1000;
+        return { ms, label: '30 Days (1 Month)', expiresAt: Date.now() + ms, isPermanent: false };
+    }
+
+    const count = parseInt(match[1], 10);
+    const rawUnit = (match[2] || 'd').toLowerCase();
+
+    let ms = 0;
+    let label = '';
+
+    if (rawUnit === 's') {
+        ms = count * 1000;
+        label = `${count} Second${count > 1 ? 's' : ''}`;
+    } else if (rawUnit === 'm' || rawUnit === 'mo' || rawUnit.startsWith('month')) {
+        ms = count * 30 * 24 * 60 * 60 * 1000;
+        label = `${count} Month${count > 1 ? 's' : ''} (${count * 30} Days)`;
+    } else if (rawUnit === 'h' || rawUnit.startsWith('hour') || rawUnit === 'hr') {
+        ms = count * 60 * 60 * 1000;
+        label = `${count} Hour${count > 1 ? 's' : ''}`;
+    } else if (rawUnit === 'w' || rawUnit.startsWith('week')) {
+        ms = count * 7 * 24 * 60 * 60 * 1000;
+        label = `${count} Week${count > 1 ? 's' : ''} (${count * 7} Days)`;
+    } else if (rawUnit === 'y' || rawUnit.startsWith('year')) {
+        ms = count * 365 * 24 * 60 * 60 * 1000;
+        label = `${count} Year${count > 1 ? 's' : ''}`;
+    } else {
+        ms = count * 24 * 60 * 60 * 1000;
+        label = `${count} Day${count > 1 ? 's' : ''}`;
+    }
+
+    return {
+        ms,
+        label,
+        expiresAt: Date.now() + ms,
+        isPermanent: false
+    };
+}
+
+function formatRemainingTime(expiresAt) {
+    if (!expiresAt) return { text: '♾️ Permanent (Lifetime)', isExpired: false, daysLeft: 9999 };
+    const now = Date.now();
+    const diff = expiresAt - now;
+
+    if (diff <= 0) {
+        const agoMs = Math.abs(diff);
+        const hoursAgo = Math.floor(agoMs / (60 * 60 * 1000));
+        const daysAgo = Math.floor(hoursAgo / 24);
+        const timeAgoStr = daysAgo > 0 ? `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago` : `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+        return { text: `🔴 Expired (${timeAgoStr})`, isExpired: true, daysLeft: 0 };
+    }
+
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+
+    let parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+
+    return {
+        text: `🟢 ${parts.join(' ')} remaining`,
+        isExpired: false,
+        days,
+        hours,
+        minutes
+    };
+}
+
+function formatExpiryDate(timestamp) {
+    if (!timestamp) return 'Permanent (Never Expires)';
+    try {
+        const d = new Date(timestamp);
+        return d.toLocaleString('en-US', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'Asia/Karachi'
+        });
+    } catch {
+        return new Date(timestamp).toISOString().slice(0, 10);
+    }
+}
+
 /**
- * Command: .addpm / .pmadd [number | @mention | reply]
- * Adds a user to Premium Members so they can use .arc and .chreact (which relays via .set arc)
+ * Command: .addpm / .addprem / .pmadd [number | @mention | reply] [duration]
+ * Adds a user to Premium Members with an expiration period (e.g. 30d, 1m, 7d, perm).
  */
 async function addpmCommand(sock, from, msg, isOwner, args = [], groupMetadata = null) {
     if (markCommandHandled(msg?.key?.id)) return;
@@ -1051,30 +1340,44 @@ async function addpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
         return await sock.sendMessage(from, {
             text: `╭━━━〔 🔒 *OWNER ONLY COMMAND* 〕━━━┈⊷\n` +
                   `┃ ❌ *Access Denied!*\n` +
-                  `┃ Ye command sirf Bot Owner\n` +
-                  `┃ (*03438673242*) run kar sakta hai!\n` +
+                  `┃ Ye command sirf *Bot Owner*\n` +
+                  `┃ run kar sakta hai!\n` +
                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
 
-    const target = await extractTargetUser(sock, msg, args, groupMetadata, from);
+    const { durationArg, cleanArgs } = extractDurationFromArgs(args);
+    const target = await extractTargetUser(sock, msg, cleanArgs, groupMetadata, from);
+
     if (!target) {
         return await sock.sendMessage(from, {
             text: `╭━━━〔 💎 *ADD PREMIUM MEMBER (.addpm)* 〕━━━┈⊷\n` +
-                  `┃ 📌 *Kaise Add Karein:*\n` +
-                  `┃ 1️⃣ Kisi ke message par *Reply* kar ke:\n` +
-                  `┃    👉 \`.addpm\`\n` +
-                  `┃ 2️⃣ Group me *Mention* kar ke:\n` +
-                  `┃    👉 \`.addpm @user\`\n` +
-                  `┃ 3️⃣ *Number* likh kar:\n` +
-                  `┃    👉 \`.addpm 03001234567\`\n` +
+                  `┃ 📌 *Kaise Add Karein (Days / Months ke sath):*\n` +
+                  `┃ 1️⃣ Reply kar ke duration dein:\n` +
+                  `┃    👉 \`.addpm 30d\` (30 Days)\n` +
+                  `┃    👉 \`.addpm 1m\` (1 Month)\n` +
+                  `┃    👉 \`.addpm perm\` (Lifetime)\n` +
                   `┃\n` +
-                  `┃ 🗑️ *Remove:* \`.delpm <number/@user/reply>\`\n` +
-                  `┃ 📋 *List:* \`.pmlist\`\n` +
-                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+                  `┃ 2️⃣ Mention kar ke duration dein:\n` +
+                  `┃    👉 \`.addpm @user 7d\`\n` +
+                  `┃    👉 \`.addpm @user 1m\`\n` +
+                  `┃\n` +
+                  `┃ 3️⃣ Number likh kar:\n` +
+                  `┃    👉 \`.addpm 03001234567 30d\`\n` +
+                  `┃\n` +
+                  `┃ ⏱️ *Supported Units:*\n` +
+                  `┃ • \`7d\` / \`15d\` / \`30d\` (Days)\n` +
+                  `┃ • \`1m\` / \`2m\` / \`3m\` (Months)\n` +
+                  `┃ • \`1y\` (Year) • \`perm\` (Lifetime)\n` +
+                  `┃\n` +
+                  `┃ 🔍 *Check Status:* \`.checkprem\`\n` +
+                  `┃ 📋 *List:* \`.pmlist\` • 🗑️ *Remove:* \`.delpm\`\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                  `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
         }, { quoted: msg });
     }
 
+    const durationInfo = parseDuration(durationArg);
     const data = loadOwnersData();
     const targetLast10 = target.digits && target.digits.length >= 10 ? target.digits.slice(-10) : '';
     const existing = data.premium.find(p =>
@@ -1082,10 +1385,25 @@ async function addpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
         (target.lid && p.lid === target.lid)
     );
 
+    let newExpiresAt = null;
+    let isExtended = false;
+
+    if (durationInfo.isPermanent) {
+        newExpiresAt = null;
+    } else if (existing?.expiresAt && existing.expiresAt > Date.now()) {
+        newExpiresAt = existing.expiresAt + durationInfo.ms;
+        isExtended = true;
+    } else {
+        newExpiresAt = Date.now() + durationInfo.ms;
+    }
+
     if (existing) {
         if (target.digits && !existing.digits) existing.digits = target.digits;
         if (target.lid && !existing.lid) existing.lid = target.lid;
         if (target.digits) existing.jid = `${target.digits}@s.whatsapp.net`;
+        existing.addedAt = Date.now();
+        existing.durationLabel = durationInfo.label;
+        existing.expiresAt = newExpiresAt;
         saveOwnersData(data);
     } else {
         data.premium.push({
@@ -1093,7 +1411,9 @@ async function addpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
             lid: target.lid,
             jid: target.jid,
             addedBy: MASTER_OWNER_DIGITS,
-            addedAt: Date.now()
+            addedAt: Date.now(),
+            durationLabel: durationInfo.label,
+            expiresAt: newExpiresAt
         });
         saveOwnersData(data);
     }
@@ -1102,26 +1422,89 @@ async function addpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
 
     const mentionList = target.jid ? [target.jid] : [];
     const tagDisplay = target.digits ? `@${target.digits}` : target.display;
+    const expiryStr = formatExpiryDate(newExpiresAt);
+    const remInfo = formatRemainingTime(newExpiresAt);
+    const actionLabel = isExtended ? 'Premium Extended (Time Added)' : 'Premium Activated';
 
     return await sock.sendMessage(from, {
-        text: `╭━━━〔 💎 *NEW PREMIUM MEMBER ADDED* 〕━━━┈⊷\n` +
-              `┃ ✅ *Status:* Premium Activated\n` +
+        text: `╭━━━〔 💎 *PREMIUM MEMBER SET* 〕━━━┈⊷\n` +
+              `┃ ✅ *Status:* ${actionLabel}\n` +
               `┃ 👤 *Member:* ${tagDisplay}\n` +
               `┃ 🆔 *ID:* \`${target.digits || target.lid}\`\n` +
+              `┃ ⏱️ *Duration:* ${durationInfo.label}\n` +
+              `┃ ⏳ *Time Left:* ${remInfo.text}\n` +
+              `┃ 📅 *Expiry Date:* ${expiryStr}\n` +
+              `┃\n` +
               `┃ 🔓 *Unlocked Features:*\n` +
-              `┃    • \`.arc <channel_link>\` (Auto-React)\n` +
+              `┃    • \`.chreact <post_link>\` (Multi-Server Cloud Boost)\n` +
+              `┃    • \`.arc <channel_link>\` (Auto Post Reaction)\n` +
               `┃    • \`.del arc <channel_link>\`\n` +
-              `┃    • \`.chreact <post_link>\` (73 Servers)\n` +
               `┃    • \`.chvote <post_link> 1/2\`\n` +
               `┃ 👑 *Approved By:* MR SAQIB\n` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`,
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
         mentions: mentionList
     }, { quoted: msg });
 }
 
+function matchesTargetUser(chAddedBy, target) {
+    if (!chAddedBy || !target) return false;
+    const rawAdded = String(chAddedBy).trim();
+    const addedDigits = rawAdded.replace(/[^0-9]/g, '');
+    const addedLast10 = addedDigits.length >= 10 ? addedDigits.slice(-10) : '';
+
+    if (target.digits) {
+        const tDigits = String(target.digits).replace(/[^0-9]/g, '');
+        const tLast10 = tDigits.length >= 10 ? tDigits.slice(-10) : '';
+        if (addedDigits && tDigits && (addedDigits === tDigits || (addedLast10 && tLast10 && addedLast10 === tLast10))) {
+            return true;
+        }
+        if (rawAdded.includes(tDigits)) return true;
+    }
+
+    if (target.lid) {
+        const tLid = String(target.lid).replace(/[^0-9]/g, '');
+        if (tLid && rawAdded.includes(tLid)) return true;
+    }
+
+    if (target.jid && rawAdded === target.jid) return true;
+
+    return false;
+}
+
+function cleanupUserArcChannels(targetFilterFn) {
+    let removedCount = 0;
+    const removedNames = [];
+    try {
+        const channelMenuCmds = require('../commands/channelMenuCommands');
+        const arcData = channelMenuCmds.loadArcData();
+        if (arcData && arcData.channels && typeof arcData.channels === 'object') {
+            const toDelete = [];
+            for (const [key, ch] of Object.entries(arcData.channels)) {
+                if (targetFilterFn(ch)) {
+                    toDelete.push({ key, name: ch.name || ch.invite || key, invite: ch.invite });
+                }
+            }
+            if (toDelete.length > 0) {
+                if (!arcData.deletedChannels) arcData.deletedChannels = {};
+                for (const item of toDelete) {
+                    delete arcData.channels[item.key];
+                    arcData.deletedChannels[item.key] = Date.now();
+                    if (item.invite) arcData.deletedChannels[item.invite] = Date.now();
+                    removedCount++;
+                    removedNames.push(item.name);
+                }
+                channelMenuCmds.saveArcData(arcData);
+            }
+        }
+    } catch (e) {
+        console.error('[OwnerManager Cleanup ARC Channels Error]:', e.message);
+    }
+    return { removedCount, removedNames };
+}
+
 /**
- * Command: .delpm / .pmdel [number | @mention | reply]
+ * Command: .delpm / .delprem / .pmdel [number | @mention | reply | all | expired]
  */
 async function delpmCommand(sock, from, msg, isOwner, args = [], groupMetadata = null) {
     if (markCommandHandled(msg?.key?.id)) return;
@@ -1129,18 +1512,99 @@ async function delpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
     if (!isOwner) {
         await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
         return await sock.sendMessage(from, {
-            text: `❌ *Access Denied!* Sirf Bot Owner (*03438673242*) premium member remove kar sakta hai.`
-        }, { quoted: msg });
-    }
-
-    const target = await extractTargetUser(sock, msg, args, groupMetadata, from);
-    if (!target) {
-        return await sock.sendMessage(from, {
-            text: `❌ *Usage:* Kisi message par reply kar ke \`.delpm\` likhein, ya \`.delpm @user\` / \`.delpm 03001234567\` likhein!`
+            text: `❌ *Access Denied!* Sirf *Bot Owner* hi premium member remove kar sakta hai.`
         }, { quoted: msg });
     }
 
     const data = loadOwnersData();
+
+    // Support: .delprem expired / .delpm expired
+    if (args[0] && args[0].toLowerCase() === 'expired') {
+        const now = Date.now();
+        const beforeCount = data.premium.length;
+        const expiredUsers = data.premium.filter(p => p.expiresAt && p.expiresAt <= now);
+        data.premium = data.premium.filter(p => !p.expiresAt || p.expiresAt > now);
+        const removedCount = beforeCount - data.premium.length;
+        if (removedCount === 0) {
+            return await sock.sendMessage(from, {
+                text: `ℹ️ *Koi bhi expired premium member nahi mila.* Sabhi active hain!`
+            }, { quoted: msg });
+        }
+        saveOwnersData(data);
+
+        // Also clean up any channels added by these expired members
+        const { removedCount: removedChCount } = cleanupUserArcChannels((ch) => {
+            return expiredUsers.some(expUser => matchesTargetUser(ch.addedBy, expUser));
+        });
+
+        await sock.sendMessage(from, { react: { text: '🗑️', key: msg.key } }).catch(() => {});
+        let channelCleanNote = '';
+        if (removedChCount > 0) {
+            channelCleanNote = `\n┃ 📺 *Auto-React Channels Removed:* ${removedChCount} channel(s) cleared!`;
+        }
+
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 🗑️ *EXPIRED MEMBERS CLEANED* 〕━━━┈⊷\n` +
+                  `┃ ✅ Tamam *${removedCount}* Expired members list se saaf kar diye gaye!${channelCleanNote}\n` +
+                  `┃ 🟢 *Baaqi Active Members:* ${data.premium.length}\n` +
+                  `┃ ☁️ *Cloud Database:* MongoDB Atlas Synced\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                  `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
+        }, { quoted: msg });
+    }
+
+    // Support: .delprem all / .delpm all
+    if (args[0] && args[0].toLowerCase() === 'all') {
+        const count = data.premium.length;
+        if (count === 0) {
+            return await sock.sendMessage(from, {
+                text: `ℹ️ *Premium list pehle se khaali hai! Koi user mojood nahi.*`
+            }, { quoted: msg });
+        }
+        data.premium = [];
+        saveOwnersData(data);
+
+        // Clean up channels of all removed premium members (keeping owner channels intact)
+        const masterDigits = MASTER_OWNER_DIGITS;
+        const ownerDigitsList = (data.owners || []).map(o => normalizePhoneDigits(o.digits)).filter(Boolean);
+        const { removedCount: removedChCount } = cleanupUserArcChannels((ch) => {
+            const chDigits = String(ch.addedBy || '').replace(/[^0-9]/g, '');
+            if (chDigits === masterDigits || chDigits.endsWith(MASTER_LAST10)) return false;
+            if (ownerDigitsList.some(od => chDigits === od || chDigits.endsWith(od.slice(-10)))) return false;
+            return true;
+        });
+
+        await sock.sendMessage(from, { react: { text: '🗑️', key: msg.key } }).catch(() => {});
+        let channelCleanNote = '';
+        if (removedChCount > 0) {
+            channelCleanNote = `\n┃ 📺 *Auto-React Channels Removed:* ${removedChCount} channel(s) cleared!`;
+        }
+
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 🗑️ *ALL PREMIUM CLEARED* 〕━━━┈⊷\n` +
+                  `┃ ✅ Tamam *${count}* Premium members list se remove kar diye gaye!${channelCleanNote}\n` +
+                  `┃ 🔒 *Access:* Premium Access Revoked for all\n` +
+                  `┃ ☁️ *Cloud Database:* MongoDB Atlas Synced\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                  `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
+        }, { quoted: msg });
+    }
+
+    const { cleanArgs } = extractDurationFromArgs(args);
+    const target = await extractTargetUser(sock, msg, cleanArgs.length ? cleanArgs : args, groupMetadata, from);
+    if (!target) {
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 🗑️ *DELETE PREMIUM (.delprem)* 〕━━━┈⊷\n` +
+                  `┃ 📌 *Usage:*\n` +
+                  `┃ 1️⃣ Reply kar ke: \`.delprem\`\n` +
+                  `┃ 2️⃣ Mention kar ke: \`.delprem @user\`\n` +
+                  `┃ 3️⃣ Number likh kar: \`.delprem 03001234567\`\n` +
+                  `┃ 4️⃣ Expired saaf karne ke liye: \`.delprem expired\`\n` +
+                  `┃ 5️⃣ Sab ko hatane ke liye: \`.delprem all\`\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+        }, { quoted: msg });
+    }
+
     const beforeCount = data.premium.length;
     const targetLast10 = target.digits && target.digits.length >= 10 ? target.digits.slice(-10) : '';
     data.premium = data.premium.filter(p => {
@@ -1156,19 +1620,32 @@ async function delpmCommand(sock, from, msg, isOwner, args = [], groupMetadata =
     }
 
     saveOwnersData(data);
+
+    // Prune all channels added by this removed user from channel_arc.json
+    const { removedCount: removedChCount, removedNames: removedChNames } = cleanupUserArcChannels((ch) => {
+        return matchesTargetUser(ch.addedBy, target);
+    });
+
     await sock.sendMessage(from, { react: { text: '🗑️', key: msg.key } }).catch(() => {});
+
+    let chReport = '';
+    if (removedChCount > 0) {
+        chReport = `\n┃ 📺 *Auto-React Channels Deleted:* ${removedChCount} channel(s)\n` +
+                   `┃    ↳ ${removedChNames.slice(0, 3).join(', ')}${removedChNames.length > 3 ? '...' : ''}`;
+    }
 
     return await sock.sendMessage(from, {
         text: `╭━━━〔 🗑️ *PREMIUM MEMBER REMOVED* 〕━━━┈⊷\n` +
               `┃ 👤 *Removed:* ${target.display}\n` +
-              `┃ 🔒 *Status:* Premium Access Revoked\n` +
+              `┃ 🔒 *Status:* Premium Access Revoked${chReport}\n` +
+              `┃ ☁️ *Cloud Database:* MongoDB Atlas Synced\n` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
     }, { quoted: msg });
 }
 
 /**
- * Command: .pmlist / .premlist
+ * Command: .pmlist / .premlist / .listprem
  */
 async function pmlistCommand(sock, from, msg, isOwner) {
     if (markCommandHandled(msg?.key?.id)) return;
@@ -1177,26 +1654,450 @@ async function pmlistCommand(sock, from, msg, isOwner) {
     }
 
     const data = loadOwnersData();
-    if (!data.premium.length) {
+    if (!data.premium || !data.premium.length) {
         return await sock.sendMessage(from, {
             text: `╭━━━〔 💎 *PREMIUM MEMBERS LIST* 〕━━━┈⊷\n` +
                   `┃ 📭 Abhi koi Premium Member add nahi hai.\n` +
-                  `┃ 👉 Add karne ke liye: \`.addpm <number/@user/reply>\`\n` +
+                  `┃ 👉 Add karne ke liye: \`.addpm <number/@user/reply> [duration]\`\n` +
+                  `┃ 💡 Example: \`.addpm 03001234567 30d\`\n` +
                   `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
         }, { quoted: msg });
     }
 
+    let activeCount = 0;
+    let expiredCount = 0;
     let listText = '';
+
     data.premium.forEach((p, i) => {
         const label = p.digits ? `+${p.digits}` : `LID:${p.lid}`;
-        listText += `┃ 💎 *${i + 1}. ${label}* (Premium)\n`;
+        const rem = formatRemainingTime(p.expiresAt);
+        const expStr = formatExpiryDate(p.expiresAt);
+
+        if (rem.isExpired) {
+            expiredCount++;
+            listText += `┃ 🔴 *${i + 1}. ${label}*\n` +
+                        `┃    ↳ Status: Expired\n` +
+                        `┃    ↳ Expiry: ${expStr}\n`;
+        } else {
+            activeCount++;
+            const statusIcon = p.expiresAt ? '🟢' : '♾️';
+            listText += `┃ ${statusIcon} *${i + 1}. ${label}*\n` +
+                        `┃    ↳ Remaining: ${rem.text}\n` +
+                        `┃    ↳ Expiry: ${expStr}\n`;
+        }
     });
 
     return await sock.sendMessage(from, {
-        text: `╭━━━〔 💎 *PREMIUM MEMBERS (${data.premium.length})* 〕━━━┈⊷\n` +
-              `${listText}` +
+        text: `╭━━━〔 💎 *PREMIUM MEMBERS LIST* 〕━━━┈⊷\n` +
+              `┃ 📊 *Summary:* 🟢 ${activeCount} Active • 🔴 ${expiredCount} Expired\n` +
+              `┃\n` +
+              listText +
+              `┃\n` +
+              `┃ 💡 *Add/Renew:* \`.addpm <user> <30d/1m/perm>\`\n` +
+              `┃ 🧹 *Clean Expired:* \`.delpm expired\`\n` +
+              `┃ 🗑️ *Remove:* \`.delpm <user>\`\n` +
               `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
-              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴛᴇᴀᴍ-ᴍʀ-sᴀǫɪʙ*`
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`
+    }, { quoted: msg });
+}
+
+/**
+ * Command: .checkprem / .myprem / .preminfo
+ * Anyone can check their own status, or owner can check any user's status!
+ */
+async function checkpremCommand(sock, from, msg, isOwner, args = [], groupMetadata = null) {
+    if (markCommandHandled(msg?.key?.id)) return;
+
+    let target = null;
+    if (args.length > 0) {
+        target = await extractTargetUser(sock, msg, args, groupMetadata, from);
+    } else {
+        const isGroup = Boolean(from && String(from).endsWith('@g.us'));
+        const isMe = Boolean(msg?.key?.fromMe);
+        const rawSender = msg?.key?.participant || msg?.participant || (isMe ? sock?.user?.id : from) || '';
+        const digits = normalizePhoneDigits(rawSender);
+        const lid = extractLidDigits(rawSender, true);
+        target = {
+            digits,
+            lid,
+            jid: digits ? `${digits}@s.whatsapp.net` : (rawSender.endsWith('@lid') ? rawSender : `${rawSender}@s.whatsapp.net`),
+            display: digits ? `+${digits}` : (lid ? `LID:${lid}` : 'User')
+        };
+    }
+
+    if (!target) {
+        return await sock.sendMessage(from, {
+            text: `❌ User detect nahi ho saka. \`.checkprem @user\` likhein ya direct \`.checkprem\` bhejein.`
+        }, { quoted: msg });
+    }
+
+    // Retrieve ARC channels added by target
+    let userArcChannels = [];
+    try {
+        const channelMenuCmds = require('../commands/channelMenuCommands');
+        const arcData = channelMenuCmds.loadArcData();
+        if (arcData && arcData.channels) {
+            for (const [k, ch] of Object.entries(arcData.channels)) {
+                if (matchesTargetUser(ch.addedBy, target)) {
+                    userArcChannels.push(ch);
+                }
+            }
+        }
+    } catch {}
+
+    const formatArcChannelsList = (quotaStr) => {
+        let text = `\n┃ 📺 *Auto-React Channels:* ${quotaStr}`;
+        if (userArcChannels.length > 0) {
+            userArcChannels.forEach((ch, idx) => {
+                const st = (ch.enabled !== false && ch.active !== false) ? '🟢' : '⏸️';
+                text += `\n┃    ${idx + 1}. ${st} *${ch.name || 'Channel'}*`;
+            });
+        }
+        return text;
+    };
+
+    const isMaster = (target.digits && (target.digits === MASTER_OWNER_DIGITS || target.digits.endsWith(MASTER_LAST10)));
+    if (isMaster) {
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 👑 *MEMBERSHIP STATUS* 〕━━━┈⊷\n` +
+                  `┃ 👤 *User:* ${target.display}\n` +
+                  `┃ 👑 *Rank:* Master Bot Owner\n` +
+                  `┃ 🟢 *Status:* Active\n` +
+                  `┃ ♾️ *Duration:* Lifetime Unlimited${formatArcChannelsList(`${userArcChannels.length} Channels (Unlimited)`)}\n` +
+                  `┃ 🔓 *All Premium & Owner Controls Active*\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                  `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
+            mentions: target.jid ? [target.jid] : []
+        }, { quoted: msg });
+    }
+
+    const data = loadOwnersData();
+    const targetLast10 = target.digits && target.digits.length >= 10 ? target.digits.slice(-10) : '';
+
+    const isCoOwner = (data.owners || []).some(o =>
+        (target.digits && o.digits && (o.digits === target.digits || (targetLast10 && o.digits.endsWith(targetLast10)))) ||
+        (target.lid && o.lid === target.lid)
+    );
+    if (isCoOwner) {
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 🛡️ *MEMBERSHIP STATUS* 〕━━━┈⊷\n` +
+                  `┃ 👤 *User:* ${target.display}\n` +
+                  `┃ 🛡️ *Rank:* Bot Co-Owner\n` +
+                  `┃ 🟢 *Status:* Active\n` +
+                  `┃ ♾️ *Duration:* Lifetime Unlimited${formatArcChannelsList(`${userArcChannels.length} Channels (Unlimited)`)}\n` +
+                  `┃ 🔓 *All Premium Features Unlocked*\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                  `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
+            mentions: target.jid ? [target.jid] : []
+        }, { quoted: msg });
+    }
+
+    const pm = (data.premium || []).find(p =>
+        (target.digits && p.digits && (p.digits === target.digits || (targetLast10 && p.digits.endsWith(targetLast10)))) ||
+        (target.lid && p.lid === target.lid)
+    );
+
+    if (pm) {
+        const rem = formatRemainingTime(pm.expiresAt);
+        const expStr = formatExpiryDate(pm.expiresAt);
+
+        if (rem.isExpired) {
+            return await sock.sendMessage(from, {
+                text: `╭━━━〔 💎 *MEMBERSHIP STATUS* 〕━━━┈⊷\n` +
+                      `┃ 👤 *User:* ${target.display}\n` +
+                      `┃ 🏷️ *Plan:* Premium Member (Expired)\n` +
+                      `┃ 🔴 *Status:* ${rem.text}\n` +
+                      `┃ 📅 *Expired On:* ${expStr}${formatArcChannelsList(`${userArcChannels.length} Channels (Paused/Expired)`)}\n` +
+                      `┃\n` +
+                      `┃ 🔄 *Renew karane ke liye Channel visit karein:*\n` +
+                      `┃ 👉 ${config.channelLink || 'https://whatsapp.com/channel/0029VbDzLTD1iUxe8Hsv1D0M'}\n` +
+                      `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+                      `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
+                mentions: target.jid ? [target.jid] : []
+            }, { quoted: msg });
+        }
+
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 💎 *MEMBERSHIP STATUS* 〕━━━┈⊷\n` +
+              `┃ 👤 *User:* ${target.display}\n` +
+              `┃ 🏷️ *Plan:* Premium Member\n` +
+              `┃ 🟢 *Status:* Active\n` +
+              `┃ ⏳ *Time Left:* ${rem.text}\n` +
+              `┃ 📅 *Expires:* ${expStr}\n` +
+              `┃ ⏱️ *Original Duration:* ${pm.durationLabel || 'Custom'}${formatArcChannelsList(`${userArcChannels.length}/3 Channels Used`)}\n` +
+              `┃ 🔓 *Unlocked Features:*\n` +
+              `┃    • Multi-Bot Channel Reaction Boost (50+ Bots)\n` +
+              `┃    • Auto Post Reaction (.set arc)\n` +
+              `┃    • Channel Poll Voting (.chvote)\n` +
+              `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
+            mentions: target.jid ? [target.jid] : []
+        }, { quoted: msg });
+    }
+
+    const freeChannelsNote = userArcChannels.length > 0 ? formatArcChannelsList(`${userArcChannels.length} Channels (Needs Premium)`) : '';
+
+    return await sock.sendMessage(from, {
+        text: `╭━━━〔 👤 *MEMBERSHIP STATUS* 〕━━━┈⊷\n` +
+              `┃ 👤 *User:* ${target.display}\n` +
+              `┃ 🏷️ *Plan:* Free User\n` +
+              `┃ ⚪ *Status:* No Active Premium${freeChannelsNote}\n` +
+              `┃\n` +
+              `┃ 👑 *50+ Multi-Bot Boost & Auto-Reaction ke liye*\n` +
+              `┃ *Premium Access hasil karein:*\n` +
+              `┃ 👉 ${config.channelLink || 'https://whatsapp.com/channel/0029VbDzLTD1iUxe8Hsv1D0M'}\n` +
+              `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+              `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`,
+        mentions: target.jid ? [target.jid] : []
+    }, { quoted: msg });
+}
+
+/**
+ * Command: .cs / .checksession / .checksessions / .sessions / .paired
+ * Strictly executable ONLY by Bot Owner (isOwner / isMasterOwner)
+ * Inspects all paired numbers connected to this bot instance and displays detailed status.
+ */
+async function checkSessionsCommand(sock, from, msg, isOwner, args = [], sessionsMap = {}, authDir = null) {
+    if (markCommandHandled(msg?.key?.id)) return;
+
+    if (!isOwner) {
+        await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
+        return await sock.sendMessage(from, {
+            text: `╭━━━〔 🔒 *OWNER ONLY COMMAND* 〕━━━┈⊷\n` +
+                  `┃ ❌ *Access Denied!*\n` +
+                  `┃ Sirf *Bot Owner* hi paired sessions check kar sakta hai!\n` +
+                  `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷`
+        }, { quoted: msg });
+    }
+
+    await sock.sendMessage(from, { react: { text: '🔍', key: msg.key } }).catch(() => {});
+
+    // Collect all session IDs from local memory and disk
+    const sessionIds = new Set(Object.keys(sessionsMap || {}));
+    if (authDir && fs.existsSync(authDir)) {
+        try {
+            const files = fs.readdirSync(authDir);
+            for (const f of files) {
+                if (f.startsWith('.') || f.includes('_backup_') || f.includes('_expired_') || f.includes('_store') || f.endsWith('.json')) continue;
+                const fullP = path.join(authDir, f);
+                try {
+                    if (fs.statSync(fullP).isDirectory() && fs.existsSync(path.join(fullP, 'creds.json'))) {
+                        sessionIds.add(f);
+                    }
+                } catch (_) {}
+            }
+        } catch (_) {}
+    }
+
+    // Deduplicate sessions by real physical phone number (avoids dual-key or qr_ temp alias showing as 2 devices)
+    const uniqueMap = new Map();
+    for (const id of sessionIds) {
+        if (id.startsWith('qr_') && !sessionsMap?.[id]?.isConnected) continue;
+        const sess = sessionsMap?.[id];
+        const rawPhone = sess?.sock?.user?.id ? jidNormalizedUser(sess.sock.user.id) : null;
+        const phone = rawPhone
+            ? rawPhone.split('@')[0].split(':')[0].replace(/[^0-9]/g, '')
+            : id.replace(/[^0-9]/g, '');
+        if (!phone || phone.length < 9) continue;
+
+        const isOnline = Boolean(sess && sess.isConnected);
+        const pushName = sess?.sock?.user?.name || sess?.sock?.user?.notify || '';
+        const platform = sess?.sock?.user?.platform || 'Multi-Device';
+
+        if (uniqueMap.has(phone)) {
+            const existing = uniqueMap.get(phone);
+            if (!existing.isOnline && isOnline) {
+                uniqueMap.set(phone, { id: phone, isOnline: true, pushName: pushName || existing.pushName, platform: platform || existing.platform });
+            }
+        } else {
+            uniqueMap.set(phone, { id: phone, isOnline, pushName, platform });
+        }
+    }
+
+    const items = Array.from(uniqueMap.values());
+    const onlineCount = items.filter(it => it.isOnline).length;
+    const offlineCount = items.filter(it => !it.isOnline).length;
+
+    // Server Environment Detection
+    const isHeroku = Boolean(process.env.HEROKU_APP_NAME || process.env.DYNO);
+    const isRailway = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_NAME);
+    const serverNode = isHeroku ? 'Heroku Dyno (Server 1)' : (isRailway ? 'Railway Cloud Engine' : 'Dedicated Cloud Node');
+
+    // System stats
+    const uptimeSec = Math.floor(process.uptime());
+    const uptimeHrs = Math.floor(uptimeSec / 3600);
+    const uptimeMins = Math.floor((uptimeSec % 3600) / 60);
+    const ramMb = Math.round(process.memoryUsage().rss / (1024 * 1024));
+
+    // Parallel Cluster Health & Sessions Polling across 11 Nodes
+    // Cross-verify with MongoDB Atlas whatsapp_sessions cloud collection
+    let mongoClusterSessions = [];
+    try {
+        const mongoSync = require('./mongoSync');
+        mongoClusterSessions = await mongoSync.getAllClusterSessions();
+    } catch (_) {}
+
+    const clusterResults = await Promise.allSettled(
+        CLUSTER_MONITOR_NODES.map(async (node) => {
+            const t0 = Date.now();
+            const mongoForNode = mongoClusterSessions.filter(s => s && s.nodeId === node.id);
+            const mongoCount = mongoForNode.length;
+            try {
+                const isCurrentHost = (isRailway && node.id === 'railway') || (isHeroku && process.env.HEROKU_APP_NAME?.includes(node.id));
+                if (isCurrentHost) {
+                    return {
+                        id: node.id,
+                        name: node.name,
+                        online: true,
+                        active: onlineCount,
+                        total: Math.max(sessionList.length, mongoCount),
+                        ping: 1,
+                        isCurrent: true,
+                        sessions: sessionList
+                    };
+                }
+
+                const res = await axios.get(`${node.url}/health`, {
+                    timeout: 6500,
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) SaqibBotClusterMonitor/2.0' }
+                });
+                const ping = Date.now() - t0;
+                const data = res.data || {};
+                const apiActive = (typeof data.activeSessions === 'number') ? data.activeSessions : (data.pairedSessions || 0);
+                const active = Math.max(apiActive, mongoCount);
+                return {
+                    id: node.id,
+                    name: node.name,
+                    online: true,
+                    active: active,
+                    total: Math.max(data.pairedSessions || active, mongoCount),
+                    ping,
+                    isCurrent: false,
+                    sessions: mongoForNode.map(s => s._id)
+                };
+            } catch (_) {
+                if (mongoCount > 0) {
+                    return {
+                        id: node.id,
+                        name: node.name,
+                        online: true,
+                        active: mongoCount,
+                        total: mongoCount,
+                        ping: null,
+                        isCurrent: false,
+                        sessions: mongoForNode.map(s => s._id)
+                    };
+                }
+                return {
+                    id: node.id,
+                    name: node.name,
+                    online: false,
+                    active: 0,
+                    total: 0,
+                    ping: null,
+                    isCurrent: false,
+                    sessions: []
+                };
+            }
+        })
+    );
+
+    let clusterTotalActive = 0;
+    let clusterOnlineNodes = 0;
+    const nodeLines = [];
+
+    clusterResults.forEach((res, idx) => {
+        const fallback = CLUSTER_MONITOR_NODES[idx];
+        const val = res.status === 'fulfilled' ? res.value : { name: fallback.name, online: false, active: 0, ping: null };
+        if (val.online) {
+            clusterOnlineNodes++;
+            clusterTotalActive += val.active;
+            const pingStr = val.isCurrent ? '⚡ Current Host' : (val.ping ? `${val.ping}ms` : 'Cloud Sync');
+            const activeStr = val.active > 0 ? `🟢 *${val.active} Paired*` : `⚪ 0 Paired`;
+            nodeLines.push(`┃ 🔹 *${val.name}:* ${activeStr} _(${pingStr})_`);
+        } else {
+            nodeLines.push(`┃ 🔹 *${val.name}:* 🔴 Offline`);
+        }
+    });
+
+    let listText = '';
+    let counter = 1;
+
+    // 1. Host node connected numbers
+    if (items.length > 0) {
+        items.forEach((it) => {
+            const statusEmoji = it.isOnline ? '🟢 *ONLINE*' : '🔴 *OFFLINE*';
+            const nameStr = it.pushName ? ` (${it.pushName})` : '';
+            listText += '┃ *' + counter + '.* 📱 `+' + it.id + '`' + nameStr + '\n' +
+                        `┃    └ Node: *${serverNode}* | Status: ${statusEmoji}\n`;
+            counter++;
+        });
+    }
+
+    // 2. Remote cluster node numbers (from MongoDB cloud sync across 11 nodes)
+    const hostNumberSet = new Set(items.map(it => String(it.id).replace(/[^0-9]/g, '')));
+    clusterResults.forEach((res) => {
+        if (res.status === 'fulfilled') {
+            const val = res.value;
+            if (!val.isCurrent && Array.isArray(val.sessions) && val.sessions.length > 0) {
+                val.sessions.forEach((sId) => {
+                    const cleanNum = String(sId).replace(/[^0-9]/g, '');
+                    if (!cleanNum || hostNumberSet.has(cleanNum)) return;
+                    hostNumberSet.add(cleanNum);
+                    listText += '┃ *' + counter + '.* 📱 `+' + cleanNum + '`\n' +
+                                `┃    └ Node: *${val.name}* | Status: 🟢 *ONLINE (Cluster)*\n`;
+                    counter++;
+                });
+            }
+        }
+    });
+
+    if (!listText) {
+        listText = `┃ 📭 *Cluster me koi number pair nahi mila!*`;
+    }
+
+    const message =
+`╭━━━〔 🖥️ *11-NODE MEGA CLUSTER (.cs)* 〕━━━┈⊷\n` +
+`┃ 👑 *Master Owner:* MR SAQIB\n` +
+`┃ 🌐 *Current Host:* ${serverNode}\n` +
+`┃ ⚡ *RAM Usage:* ${ramMb} MB | *Uptime:* ${uptimeHrs}h ${uptimeMins}m\n` +
+`┃\n` +
+`┃ 📊 *CLUSTER SUMMARY:*\n` +
+`┃ 🌐 *Cluster Nodes:* ${clusterOnlineNodes}/11 Online\n` +
+`┃ 🚀 *TOTAL CLUSTER PAIRED:* ${clusterTotalActive} Numbers Active\n` +
+`┃ 🟢 *Host Active:* ${onlineCount} | 🔴 *Host Idle:* ${offlineCount}\n` +
+`┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n` +
+`┃ 🌐 *11-NODE LIVE BREAKDOWN:*\n` +
+`${nodeLines.join('\n')}\n` +
+`┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n` +
+`┃ 📋 *CLUSTER PAIRED NUMBERS LIST:*\n` +
+`┃\n` +
+`${listText}\n` +
+`╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┈⊷\n\n` +
+`> 🔒 *Visitor Privacy:* Protected (Public cannot see these numbers)\n` +
+`> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴍʀ-sᴀǫɪʙ*`;
+
+    return await sock.sendMessage(from, { text: message }, { quoted: msg });
+}
+
+/**
+ * Command: .delcs / .rmcs / .logoutcs [number]
+ * Allows Bot Owner to disconnect and remove a paired session.
+ */
+async function delSessionCommand(sock, from, msg, isOwner, args = [], sessionsMap = {}, authDir = null, logoutFn = null) {
+    if (markCommandHandled(msg?.key?.id)) return;
+    if (!isOwner) {
+        return await sock.sendMessage(from, { text: `❌ *Access Denied!* Sirf Bot Owner ye command chala sakta hai.` }, { quoted: msg });
+    }
+    const rawTarget = (args[0] || '').replace(/[^0-9]/g, '');
+    if (!rawTarget) {
+        return await sock.sendMessage(from, { text: `❌ *Usage:* \`.delcs 923001234567\`` }, { quoted: msg });
+    }
+    if (typeof logoutFn === 'function') {
+        await logoutFn(rawTarget);
+    }
+    return await sock.sendMessage(from, {
+        text: `✅ Session *+${rawTarget}* ko disconnect aur remove kar diya gaya!`
     }, { quoted: msg });
 }
 
@@ -1220,5 +2121,8 @@ module.exports = {
     ownlistCommand,
     addpmCommand,
     delpmCommand,
-    pmlistCommand
+    pmlistCommand,
+    checkpremCommand,
+    checkSessionsCommand,
+    delSessionCommand
 };
