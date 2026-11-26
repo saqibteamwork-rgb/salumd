@@ -190,6 +190,9 @@ const { executePlugin } = require('./lib/pluginRunner');
 const groupMenuCmds = require('./commands/groupMenuCommands');
 const channelMenuCmds = require('./commands/channelMenuCommands');
 const { gcstatusCommand } = require('./commands/gcstatus');
+const { installSoundStickerProtoPatch } = require('./lib/soundStickerProto');
+const { soundStickerCommand } = require('./commands/soundSticker');
+installSoundStickerProtoPatch();
 
 const app = express();
 const server = http.createServer(app);
@@ -2344,6 +2347,9 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         // ===== NEW UPGRADE: Transferred from D:\PDF-Base-main (1) =====
                                         case 'lottie': case 'was': case 'asticker': case 'avatar': case 'lottiesticker':
                                             await lottieCommand(this.sock, from, msg, args);
+                                            break;
+                                        case 'ssound': case 'stickersound': case 'soundsticker': case 'stikersound': case 'stickeraudio': case 'saudio': case 'sfxsticker':
+                                            await soundStickerCommand(this.sock, from, msg, args);
                                             break;
                                         case 'sim': case 'simdata': case 'cnic':
                                             await simdataCommand(this.sock, from, msg, args);
