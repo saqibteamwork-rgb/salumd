@@ -211,10 +211,6 @@ async function executeArcAutoReaction(primarySock, channelJid, serverId, conf) {
     const s = uniqueSocks[i];
     const emoji = emojis[i % emojis.length];
     try {
-      if (typeof s.newsletterFollow === 'function') {
-        await withTimeout(s.newsletterFollow(channelJid), 4000).catch(() => {});
-        await sleep(300);
-      }
       if (typeof s.newsletterReactMessage === 'function') {
         await withTimeout(s.newsletterReactMessage(channelJid, String(serverId), emoji), 5000);
         successCount++;
