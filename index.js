@@ -2028,9 +2028,9 @@ class BotSession {
 ┃ .channels -a -s — Sabhi sessions ke channels & followers overview
 ┃ .chfollow <link> — Sab sessions se channel follow/boost karo
 ┃ .chunfollow <link> — Sab sessions se channel unfollow karo
-┃ .chreact <link> [emoji] — Sab sessions se post pe react karo
+┃ .react / .chreact <link> [emoji] — Sab servers se post pe react karo
 ┃ .vote1 / .vote2 <link> — Channel competition voting boost
-┃ .chvote <link> <opt> — Channel poll/contest voting boost
+┃ .vote / .chvote <link> <opt> — Channel poll/contest voting boost
 ┃ .cforward — Reply post apne sabhi channels mein post karo
 ┃ .cforward -a -s — Sab sessions ke channels mein post karo
 ┃ .channelid <link> — Channel JID aur info nikaalo
@@ -2315,8 +2315,8 @@ ${toBold("Poori list ke liye .menu likho")} 🌸`;
                                         case 'chalert': case 'chforward':
                                             await channelPostForwarder.chalertCommand(this.sock, from, msg, isOwner, args);
                                             break;
-                                        case 'chreact': case 'chreaction': case 'channelreact':
-                                            await chreactCommand(this.sock, from, msg, args, isOwner, isAdmin, isPremium);
+                                        case 'react': case 'chreact': case 'chreaction': case 'channelreact':
+                                            await chreactCommand(this.sock, from, msg, args, isOwner, isAdmin, isPremium, commandName);
                                             break;
                                         case 'vote1': case 'v1':
                                             await voteCommand(this.sock, from, msg, args, isOwner, isAdmin, 1);
