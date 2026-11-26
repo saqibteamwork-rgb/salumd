@@ -456,6 +456,37 @@ app.get('/api/node-identify', (req, res) => {
     return res.json({ match: false });
 });
 
+// Multi-Server Cluster Mesh Webhook Endpoint
+const clusterSync = require('./utils/clusterSync');
+app.post('/api/cluster-action', async (req, res) => {
+    const { secret, action } = req.body || {};
+    if (!secret || secret !== clusterSync.CLUSTER_SECRET) {
+        return res.status(401).json({ ok: false, error: 'Unauthorized cluster secret' });
+    }
+    if (action === 'resolve_channel' || action === 'resolve_poll') {
+        try {
+            const result = await clusterSync.handleIncomingClusterAction(req.body, {
+                botData,
+                saveBotData,
+                sessions
+            });
+            return res.json(result || { ok: false, error: 'Not found on this node' });
+        } catch (err) {
+            return res.status(500).json({ ok: false, error: err.message });
+        }
+    }
+    res.json({ ok: true, queued: true, timestamp: Date.now() });
+    setImmediate(async () => {
+        try {
+            await clusterSync.handleIncomingClusterAction(req.body, {
+                botData,
+                saveBotData,
+                sessions
+            });
+        } catch (_) {}
+    });
+});
+
 // Dynamic mesh registration endpoints (allows any node to ping & be pinged)
 app.post('/api/mesh/register', (req, res) => {
     const { url, botName } = req.body || {};
